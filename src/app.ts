@@ -38,6 +38,9 @@ import { registerBudgetsRoutes } from "./modules/budgets/budgets.controller.ts";
 import { GoalsRepository } from "./modules/goals/goals.repository.ts";
 import { GoalsService } from "./modules/goals/goals.service.ts";
 import { registerGoalsRoutes } from "./modules/goals/goals.controller.ts";
+import { HabitsRepository } from "./modules/habits/habits.repository.ts";
+import { HabitsService } from "./modules/habits/habits.service.ts";
+import { registerHabitsRoutes } from "./modules/habits/habits.controller.ts";
 import { SlidingWindowRateLimiter } from "./shared/utils/rate-limiter.ts";
 import { API_VERSION, APP_VERSION } from "./version.ts";
 
@@ -134,6 +137,9 @@ export function createApp({ db, config, logger }: AppDependencies) {
     preferences: repository,
   });
 
+  const habitsRepository = new HabitsRepository(db);
+  const habitsService = new HabitsService({ db, repository: habitsRepository });
+
   app.use("*", csrfProtection(config));
   app.use("/api/v1/auth/register", rateLimit(rateLimiter, config, { scope: "auth-register" }));
   app.use("/api/v1/auth/login", rateLimit(rateLimiter, config, { scope: "auth-login" }));
@@ -153,6 +159,10 @@ export function createApp({ db, config, logger }: AppDependencies) {
   app.use("/api/v1/budgets/*", requireAuth(repository, config));
   app.use("/api/v1/goals", requireAuth(repository, config));
   app.use("/api/v1/goals/*", requireAuth(repository, config));
+  app.use("/api/v1/habits", requireAuth(repository, config));
+  app.use("/api/v1/habits/*", requireAuth(repository, config));
+  app.use("/api/v1/habit-triggers", requireAuth(repository, config));
+  app.use("/api/v1/habit-triggers/*", requireAuth(repository, config));
 
   app.openapi(healthRoute, (c) =>
     c.json(
@@ -209,6 +219,7 @@ export function createApp({ db, config, logger }: AppDependencies) {
   registerRecurringRoutes(app, { service: recurringService, config });
   registerBudgetsRoutes(app, { service: budgetsService, config });
   registerGoalsRoutes(app, { service: goalsService, config });
+  registerHabitsRoutes(app, { service: habitsService, config });
 
   app.get("/api/docs", swaggerUI({ url: `/api/${API_VERSION}/openapi.json` }));
 

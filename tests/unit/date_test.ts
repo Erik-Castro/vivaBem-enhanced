@@ -5,6 +5,7 @@ import {
   addMonthsWithDay,
   dayOfMonth,
   daysBetween,
+  isoWeekday,
   isValidBusinessDate,
   monthBounds,
   todayUtc,
@@ -82,4 +83,16 @@ Deno.test("daysBetween e dayOfMonth são consistentes", () => {
   assertEquals(daysBetween("2026-01-31", "2026-01-01"), -30);
   assertEquals(daysBetween("2024-02-28", "2024-03-01"), 2);
   assertEquals(dayOfMonth("2026-11-05"), 5);
+});
+
+Deno.test("isoWeekday usa a convenção ISO (segunda = 1 … domingo = 7)", () => {
+  assertEquals(isoWeekday("2026-11-02"), 1);
+  assertEquals(isoWeekday("2026-11-05"), 4);
+  assertEquals(isoWeekday("2026-11-08"), 7);
+  assertEquals(isoWeekday("2024-02-29"), 4);
+});
+
+Deno.test("isoWeekday rejeita datas inválidas", () => {
+  assertThrows(() => isoWeekday("2026-02-30"), RangeError);
+  assertThrows(() => isoWeekday("05/11/2026"), RangeError);
 });

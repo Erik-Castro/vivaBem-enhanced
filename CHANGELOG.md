@@ -11,6 +11,55 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.5.0] - 2026-11-05
+
+Quinta release: hábitos (Fase 4).
+
+### Added
+
+- Migração `004_habits.sql` com `habits`, `habit_triggers` e `habit_logs`, com
+  índices, constraints de agenda e unicidade `(habit_id, log_date)`.
+- `GET/POST /api/v1/habits`, `GET/PATCH/DELETE /api/v1/habits/{id}` e
+  `POST /api/v1/habits/{id}/reorder`.
+- `POST/GET /api/v1/habits/{id}/logs` e `DELETE /api/v1/habits/{id}/logs/{logId}`,
+  com upsert idempotente por dia e restauração de logs removidos.
+- `GET /api/v1/habits/{id}/streak` e `GET /api/v1/habits/{id}/calendar`, com
+  `?date=` opcional para avaliação determinística no passado.
+- `GET/POST /api/v1/habit-triggers`, `PATCH/DELETE /api/v1/habit-triggers/{id}`.
+- Hábitos bons e ruins com frequência diária, semanal ou personalizada por dias
+  ISO (segunda = 1 … domingo = 7).
+- Cálculo de streak que ignora dias não agendados, atravessa virada de mês e
+  ano bissexto sem depender de fuso/DST e não quebra o dia corrente de um
+  hábito bom antes de ele terminar.
+- Calendário fechado com estados `completed`, `missed`, `pending` e
+  `not_scheduled`, limitado a 366 dias.
+- Empilhamento de hábitos com pai, limite de 5 níveis, detecção de ciclos e
+  desativação recursiva da subárvore.
+- Gatilhos de substituição que ligam um hábito ruim a um hábito bom, com soft
+  delete e vínculo opcional no log (`triggerId`/`replacementUsed`).
+- Utilidade de data `isoWeekday`.
+- Testes unitários de streak/calendário e de `isoWeekday` e 8 testes de
+  integração de hábitos (114 testes no total).
+- ADRs 016–017 sobre agenda/streak e gatilhos/empilhamento.
+
+### Changed
+
+- `src/app.ts` monta `HabitsRepository`/`HabitsService` e protege
+  `/api/v1/habits` e `/api/v1/habit-triggers` com `requireAuth`.
+- Operações multi-tabela de hábitos (edição com cascata, remoção e reordenação)
+  rodam em transação.
+- OpenAPI ganhou a tag `Habits` com todas as rotas de hábitos, logs, streak,
+  calendário e gatilhos.
+- README, `AGENTS.md` e `docs/DECISIONS.md` atualizados para a Fase 4.
+
+### Security
+
+- Hábitos, logs e gatilhos são sempre escopados pelo `user_id` da sessão;
+  acesso cruzado retorna `NOT_FOUND`.
+- Registros futuros ou anteriores à criação do hábito são rejeitados, e o tipo
+  do hábito é imutável depois que existem logs.
+- A substituição de gatilho exige hábito bom ativo distinto do hábito ruim.
+
 ## [0.4.0] - 2026-11-05
 
 Quarta release: planejamento (Fase 3).

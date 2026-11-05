@@ -123,6 +123,23 @@ export function todayUtc(now: Date = new Date()): string {
   return formatBusinessDate(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 }
 
+/**
+ * Dia da semana ISO-8601 de uma data de negócio: segunda = 1 … domingo = 7.
+ *
+ * O cálculo é feito em UTC para que fusos e horário de verão nunca desloquem
+ * o dia — as datas de negócio do domínio são sempre independentes de fuso.
+ */
+export function isoWeekday(date: string): number {
+  assertBusinessDate(date);
+
+  const year = Number(date.slice(0, 4));
+  const monthIndex = Number(date.slice(5, 7)) - 1;
+  const day = Number(date.slice(8, 10));
+  const weekday = new Date(Date.UTC(year, monthIndex, day)).getUTCDay();
+
+  return weekday === 0 ? 7 : weekday;
+}
+
 function assertBusinessDate(date: string): void {
   if (!isValidBusinessDate(date)) {
     throw new RangeError(`Data inválida: ${date}`);

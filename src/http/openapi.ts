@@ -104,6 +104,7 @@ export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppCon
       { name: "Recurring", description: "Recorrências e próximas ocorrências" },
       { name: "Budgets", description: "Orçamentos, limites e alertas" },
       { name: "Goals", description: "Metas e contribuições" },
+      { name: "Habits", description: "Hábitos, logs, streaks, calendário e gatilhos" },
     ],
   });
 }

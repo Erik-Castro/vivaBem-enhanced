@@ -118,3 +118,24 @@ com `deleted_at`; o status vira `completed` ao atingir o alvo e volta a
 dados do usuário.
 **Consequência:** a moeda da meta é imutável após a primeira contribuição e
 `DELETE /goals/{id}` apenas cancela a meta.
+
+## ADR-016 — Agenda de hábitos em dias ISO e streak em UTC
+
+**Decisão:** a agenda usa `frequency_type` (`daily`, `weekly`, `custom`) e
+`days_of_week` como array JSON de dias ISO (1 = segunda … 7 = domingo). O streak
+é calculado sobre datas de negócio com aritmética UTC, pulando dias não
+agendados e sem quebrar o dia corrente de um hábito bom.
+**Motivo:** fusos e horário de verão não podem deslocar o dia de negócio nem
+quebrar streaks; armazenar dias em JSON mantém a agenda compacta.
+**Consequência:** `daily` não aceita dias, `weekly` exige exatamente um e
+`custom` exige ao menos um; o cálculo é puro e testável sem relógio real.
+
+## ADR-017 — Gatilhos de substituição com soft delete
+
+**Decisão:** `habit_triggers` liga um hábito ruim a um hábito bom de
+substituição e é removido com `deleted_at`; desativar uma subárvore de hábitos
+remove em cascata os gatilhos relacionados.
+**Motivo:** preservar histórico de recaídas e substituições sem expor gatilhos
+de hábitos inativos.
+**Consequência:** o hábito ruim é imutável no update do gatilho e a
+substituição precisa ser um hábito bom ativo distinto.
