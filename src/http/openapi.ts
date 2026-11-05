@@ -98,6 +98,9 @@ export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppCon
       { name: "System", description: "Saúde e prontidão do serviço" },
       { name: "Auth", description: "Registro, login, refresh e logout" },
       { name: "Users", description: "Perfil, preferências e sessões" },
+      { name: "Accounts", description: "Contas, cartões e saldos" },
+      { name: "Categories", description: "Categorias e árvore de categorias" },
+      { name: "Transactions", description: "Transações, transferências e resumos" },
     ],
   });
 }

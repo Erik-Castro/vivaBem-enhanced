@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "tasks": {
     "dev": "deno run --env-file-if-exists=.env --watch --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/main.ts",
     "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/main.ts",

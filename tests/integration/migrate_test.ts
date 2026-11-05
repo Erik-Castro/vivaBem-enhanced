@@ -9,6 +9,8 @@ Deno.test("loadMigrations carrega as migrações em ordem", async () => {
   assertEquals(migrations[0]?.name, "001_core.sql");
   assertEquals(migrations[0]?.version, 1);
   assertEquals(migrations[0]?.checksum.length, 64);
+  assertEquals(migrations[1]?.name, "002_finance.sql");
+  assertEquals(migrations[1]?.version, 2);
 });
 
 Deno.test("migrate aplica uma vez e é idempotente", async () => {

@@ -44,7 +44,7 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-A Fase 0 está concluída (`0.1.0`) e a Fase 1 também (`0.2.0`). O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`) e 2 (`0.3.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -58,12 +58,17 @@ A Fase 0 está concluída (`0.1.0`) e a Fase 1 também (`0.2.0`). O que existe h
 | `src/shared/utils/rate-limiter.ts` | janela deslizante em memória |
 | `src/modules/auth/` | repository, service e controller de identidade |
 | `src/modules/users/` | `/me`, preferências e sessões |
+| `src/modules/accounts/` | contas, cartões, saldo e limite disponível |
+| `src/modules/categories/` | categorias, árvore e desativação em cascata |
+| `src/modules/transactions/` | transações, transferências, parcelas e resumos |
+| `src/shared/utils/date.ts` | datas de negócio e soma de meses com clamp |
 | `src/db/client.ts` | conexão SQLite + extensão vetorial + transações |
 | `src/db/migrate.ts` | runner forward-only com checksum |
 | `src/db/migrations/001_core.sql` | tabelas de identidade |
+| `src/db/migrations/002_finance.sql` | contas, cartões, categorias, transações e parcelas |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
 | `src/main.ts` | bootstrap: config → migrações → servidor |
-| `tests/` | unitários e integração com SQLite real (62 testes) |
+| `tests/` | unitários e integração com SQLite real (82 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
@@ -96,7 +101,7 @@ deno task check:release  # valida versão x CHANGELOG
 ### 4.2 Alvo para as próximas fases
 
 ```bash
-deno task db:seed        # dados demo (Fase 2)
+deno task db:seed        # dados demo (Fase 3)
 deno task release -- patch|minor|major
 ```
 
@@ -309,6 +314,7 @@ Regras:
 - `CHANGELOG.md` e `deno.json` devem estar sincronizados.
 - Primeira release: `0.1.0` (2026-11-05), publicada ao concluir a Fase 0.
 - Segunda release: `0.2.0` (2026-11-05), publicada ao concluir a Fase 1.
+- Terceira release: `0.3.0` (2026-11-05), publicada ao concluir a Fase 2.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -408,8 +414,8 @@ deno test --coverage
 |---|---|---|
 | 0 | Fundação: config, logger, erros, DB, migrações, testes, CI, Docker, OpenAPI base | ✅ `0.1.0` |
 | 1 | Identidade: Argon2id, sessões/cookies/rotação, CSRF, rate limit, `/me` | ✅ `0.2.0` |
-| 2 | Finanças: contas/cartão, categorias, transações/transferências/parcelas, resumos | ⏳ próximo |
-| 3 | Planejamento: recorrências, orçamentos + alertas, metas + contribuições | ⬜ |
+| 2 | Finanças: contas/cartão, categorias, transações/transferências/parcelas, resumos | ✅ `0.3.0` |
+| 3 | Planejamento: recorrências, orçamentos + alertas, metas + contribuições | ⏳ próximo |
 | 4 | Hábitos: CRUD, logs, streaks, calendário, triggers, stacking | ⬜ |
 | 5 | Investimentos: ativos, operações, posições, performance | ⬜ |
 | 6 | Engajamento: catálogo + DSL de critérios, notificações | ⬜ |
@@ -441,6 +447,9 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/http/middleware/rate-limit.ts` | Rate limit por IP |
 | `src/modules/auth/` | Registro, login, refresh, logout, reuso |
 | `src/modules/users/` | Perfil, preferências e sessões |
+| `src/modules/accounts/` | Contas, cartões, saldo e limite disponível |
+| `src/modules/categories/` | Categorias, árvore e desativação em cascata |
+| `src/modules/transactions/` | Transações, transferências, parcelas e resumos |
 | `src/db/migrations/` | Migrações SQL numeradas |
 | `bin/sqlite-vector/` | Binários de fallback da extensão vetorial |
 | `Dockerfile` | Imagem multi-stage não-root |

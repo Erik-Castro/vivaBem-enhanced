@@ -20,6 +20,15 @@ import { AuthService } from "./modules/auth/auth.service.ts";
 import { registerAuthRoutes } from "./modules/auth/auth.controller.ts";
 import { UsersService } from "./modules/users/users.service.ts";
 import { registerUsersRoutes } from "./modules/users/users.controller.ts";
+import { AccountsRepository } from "./modules/accounts/accounts.repository.ts";
+import { AccountsService } from "./modules/accounts/accounts.service.ts";
+import { registerAccountsRoutes } from "./modules/accounts/accounts.controller.ts";
+import { CategoriesRepository } from "./modules/categories/categories.repository.ts";
+import { CategoriesService } from "./modules/categories/categories.service.ts";
+import { registerCategoriesRoutes } from "./modules/categories/categories.controller.ts";
+import { TransactionsRepository } from "./modules/transactions/transactions.repository.ts";
+import { TransactionsService } from "./modules/transactions/transactions.service.ts";
+import { registerTransactionsRoutes } from "./modules/transactions/transactions.controller.ts";
 import { SlidingWindowRateLimiter } from "./shared/utils/rate-limiter.ts";
 import { API_VERSION, APP_VERSION } from "./version.ts";
 
@@ -76,6 +85,22 @@ export function createApp({ db, config, logger }: AppDependencies) {
   const authService = new AuthService({ db, config, logger, repository, rateLimiter });
   const usersService = new UsersService(repository);
 
+  const accountsRepository = new AccountsRepository(db);
+  const accountsService = new AccountsService({
+    db,
+    repository: accountsRepository,
+    preferences: repository,
+  });
+  const categoriesRepository = new CategoriesRepository(db);
+  const categoriesService = new CategoriesService(categoriesRepository);
+  const transactionsRepository = new TransactionsRepository(db);
+  const transactionsService = new TransactionsService({
+    db,
+    repository: transactionsRepository,
+    accounts: accountsRepository,
+    categories: categoriesRepository,
+  });
+
   app.use("*", csrfProtection(config));
   app.use("/api/v1/auth/register", rateLimit(rateLimiter, config, { scope: "auth-register" }));
   app.use("/api/v1/auth/login", rateLimit(rateLimiter, config, { scope: "auth-login" }));
@@ -83,6 +108,12 @@ export function createApp({ db, config, logger }: AppDependencies) {
   app.use("/api/v1/auth/logout", rateLimit(rateLimiter, config, { scope: "auth-logout" }));
   app.use("/api/v1/me", requireAuth(repository, config));
   app.use("/api/v1/me/*", requireAuth(repository, config));
+  app.use("/api/v1/accounts", requireAuth(repository, config));
+  app.use("/api/v1/accounts/*", requireAuth(repository, config));
+  app.use("/api/v1/categories", requireAuth(repository, config));
+  app.use("/api/v1/categories/*", requireAuth(repository, config));
+  app.use("/api/v1/transactions", requireAuth(repository, config));
+  app.use("/api/v1/transactions/*", requireAuth(repository, config));
 
   app.openapi(healthRoute, (c) =>
     c.json(
@@ -129,6 +160,13 @@ export function createApp({ db, config, logger }: AppDependencies) {
 
   registerAuthRoutes(app, { service: authService, config });
   registerUsersRoutes(app, { service: usersService, config });
+  registerAccountsRoutes(app, {
+    service: accountsService,
+    transactions: transactionsService,
+    config,
+  });
+  registerCategoriesRoutes(app, { service: categoriesService, config });
+  registerTransactionsRoutes(app, { service: transactionsService, config });
 
   app.get("/api/docs", swaggerUI({ url: `/api/${API_VERSION}/openapi.json` }));
 

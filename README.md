@@ -36,21 +36,33 @@ deno task dev
 
 Servidor em `http://localhost:3000`:
 
-| Rota                             | Descrição                     |
-| -------------------------------- | ----------------------------- |
-| `GET /health`                    | Liveness                      |
-| `GET /ready`                     | Readiness (banco + migrações) |
-| `GET /api/v1/openapi.json`       | Documento OpenAPI 3.1         |
-| `GET /api/docs`                  | Swagger UI                    |
-| `GET /api/v1/auth/csrf`          | Bootstrap do token CSRF       |
-| `POST /api/v1/auth/register`     | Cria conta e inicia sessão    |
-| `POST /api/v1/auth/login`        | Autentica                     |
-| `POST /api/v1/auth/refresh`      | Rotaciona a sessão            |
-| `POST /api/v1/auth/logout`       | Encerra a sessão              |
-| `GET/PATCH /api/v1/me`           | Perfil do usuário             |
-| `PATCH /api/v1/me/preferences`   | Preferências regionais        |
-| `GET /api/v1/me/sessions`        | Sessões ativas                |
-| `DELETE /api/v1/me/sessions/:id` | Revoga uma sessão             |
+| Rota                                        | Descrição                     |
+| ------------------------------------------- | ----------------------------- |
+| `GET /health`                               | Liveness                      |
+| `GET /ready`                                | Readiness (banco + migrações) |
+| `GET /api/v1/openapi.json`                  | Documento OpenAPI 3.1         |
+| `GET /api/docs`                             | Swagger UI                    |
+| `GET /api/v1/auth/csrf`                     | Bootstrap do token CSRF       |
+| `POST /api/v1/auth/register`                | Cria conta e inicia sessão    |
+| `POST /api/v1/auth/login`                   | Autentica                     |
+| `POST /api/v1/auth/refresh`                 | Rotaciona a sessão            |
+| `POST /api/v1/auth/logout`                  | Encerra a sessão              |
+| `GET/PATCH /api/v1/me`                      | Perfil do usuário             |
+| `PATCH /api/v1/me/preferences`              | Preferências regionais        |
+| `GET /api/v1/me/sessions`                   | Sessões ativas                |
+| `DELETE /api/v1/me/sessions/:id`            | Revoga uma sessão             |
+| `GET/POST /api/v1/accounts`                 | Lista e cria contas           |
+| `GET/PATCH/DELETE /api/v1/accounts/:id`     | Detalhe, edição e desativação |
+| `GET /api/v1/accounts/:id/balance`          | Saldo e limite disponível     |
+| `GET /api/v1/accounts/:id/transactions`     | Extrato da conta              |
+| `GET/POST /api/v1/categories`               | Lista e cria categorias       |
+| `GET /api/v1/categories/tree`               | Árvore de categorias          |
+| `GET/PATCH/DELETE /api/v1/categories/:id`   | Detalhe, edição e desativação |
+| `GET/POST /api/v1/transactions`             | Lista e cria transações       |
+| `GET/PATCH/DELETE /api/v1/transactions/:id` | Detalhe, edição e remoção     |
+| `GET /api/v1/transactions/summary`          | Resumo por moeda e categoria  |
+| `POST /api/v1/transactions/transfer`        | Transferência entre contas    |
+| `POST /api/v1/transactions/:id/clear`       | Marca como compensada         |
 
 O banco é criado em `./data/app.db` e as migrações rodam no boot.
 
@@ -143,6 +155,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 
 ## Status
 
-Fase 0 (fundação) e Fase 1 (identidade e autenticação) concluídas — versão atual `0.2.0`. Próxima:
-Fase 2 (finanças: contas, categorias, transações e resumos). Veja o roadmap em
+Fases 0 (fundação), 1 (identidade) e 2 (finanças) concluídas — versão atual `0.3.0`. Próxima: Fase 3
+(planejamento: recorrências, orçamentos e metas). Veja o roadmap em
 [`AGENTS.md`](AGENTS.md#16-roadmap).

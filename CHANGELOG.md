@@ -11,6 +11,51 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.3.0] - 2026-11-05
+
+Terceira release: finanças (Fase 2).
+
+### Added
+
+- Migração `002_finance.sql` com `accounts`, `credit_card_details`,
+  `categories`, `transactions` e `credit_card_transactions`, com índices e
+  constraints de integridade.
+- `GET/POST /api/v1/accounts`, `GET/PATCH/DELETE /api/v1/accounts/{id}`,
+  `GET /api/v1/accounts/{id}/balance` e
+  `GET /api/v1/accounts/{id}/transactions`.
+- Contas com moeda herdada da preferência do usuário, cartão de crédito com
+  fechamento, vencimento, limite e limite disponível calculado.
+- `GET/POST /api/v1/categories`, `GET /api/v1/categories/tree` e
+  `GET/PATCH/DELETE /api/v1/categories/{id}`.
+- Árvore de categorias com validação de tipo do pai, prevenção de ciclos e
+  desativação recursiva da subárvore.
+- `GET/POST /api/v1/transactions`, `GET/PATCH/DELETE /api/v1/transactions/{id}`,
+  `POST /api/v1/transactions/{id}/clear`, `POST /api/v1/transactions/transfer`
+  e `GET /api/v1/transactions/summary`.
+- Transferências atômicas com duas pernas assinadas e `transfer_group_id`.
+- Parcelamentos em cartão de crédito com divisão exata de centavos, datas
+  ajustadas ao fim do mês e remoção do grupo inteiro.
+- Resumo por moeda e categoria, excluindo transferências.
+- Soft delete de transações via `deleted_at`, com remoção em cascata de
+  transferências e parcelamentos.
+- Filtros e paginação (`limit`/`offset`, máximo 100) no extrato.
+- Testes unitários de datas de negócio e 14 testes de integração de finanças
+  (82 testes no total).
+- ADRs 010–012 sobre transferências, parcelamentos e imutabilidade de moeda.
+
+### Changed
+
+- `src/app.ts` monta os módulos de contas, categorias e transações atrás de
+  `requireAuth`.
+- OpenAPI ganhou as tags `Accounts`, `Categories` e `Transactions`.
+- README e `AGENTS.md` atualizados para a Fase 2.
+
+### Security
+
+- Toda query financeira é escopada pelo `user_id` da sessão; nenhuma rota
+  aceita `userId` do cliente.
+- Valores monetários são inteiros em minor units e validados na borda.
+
 ## [0.2.0] - 2026-11-05
 
 Segunda release: identidade e autenticação (Fase 1).

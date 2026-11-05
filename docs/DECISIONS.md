@@ -60,3 +60,31 @@ o Docker precisa funcionar de forma reprodutível.
 consentimento.
 **Motivo:** dados financeiros são sensíveis.
 **Consequência:** a API funciona normalmente sem worker/provider.
+
+## ADR-010 — Transferências como duas pernas assinadas
+
+**Decisão:** cada transferência gera duas linhas em `transactions` com
+`type = 'transfer'` e o mesmo `transfer_group_id`; a saída é negativa e a
+entrada positiva.
+**Motivo:** o saldo da conta passa a ser a soma direta de `amount_minor`, sem
+precisar de junções ou casos especiais por tipo.
+**Consequência:** resumos ignoram `type = 'transfer'` para não inflar receitas
+e despesas; editar/remover uma perna afeta o grupo inteiro.
+
+## ADR-011 — Parcelamentos agrupados e divisão determinística
+
+**Decisão:** um parcelamento cria N transações ligadas por
+`credit_card_transactions.installment_group_id`; os centavos restantes vão para
+as primeiras parcelas e cada data é `addMonthsClamped` a partir da primeira.
+**Motivo:** manter o total exato em centavos e evitar datas inválidas como
+31 de fevereiro.
+**Consequência:** parcelas não podem ter valor/data editados individualmente;
+remover uma parcela remove o grupo inteiro (soft delete).
+
+## ADR-012 — Moeda da conta imutável após a primeira transação
+
+**Decisão:** `currency_code` da conta pode ser alterado apenas enquanto não
+existirem transações.
+**Motivo:** misturar moedas no mesmo livro-razão quebraria somas e resumos.
+**Consequência:** transferências entre moedas diferentes são rejeitadas nesta
+fase; conversão cambial fica para uma fase futura.
