@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isValidDuration } from "./shared/utils/duration.ts";
+import { isValidDuration, parseDurationSeconds } from "./shared/utils/duration.ts";
 import type { LogLevel } from "./shared/logger/index.ts";
 
 export const APP_ENVS = ["development", "test", "production"] as const;
@@ -27,6 +27,13 @@ export interface AiConfig {
   readonly ollamaModel?: string;
 }
 
+export interface RateLimitConfig {
+  /** Máximo de tentativas por janela nos endpoints de autenticação. */
+  readonly authMax: number;
+  /** Tamanho da janela deslizante em milissegundos. */
+  readonly windowMs: number;
+}
+
 export interface AppConfig {
   readonly env: AppEnv;
   readonly isProduction: boolean;
@@ -42,6 +49,7 @@ export interface AppConfig {
   readonly argon2: Argon2Config;
   readonly logLevel: LogLevel;
   readonly vectorExtensionPath?: string;
+  readonly rateLimit: RateLimitConfig;
   readonly ai: AiConfig;
 }
 
@@ -96,6 +104,8 @@ const rawConfigSchema = z.object({
   ARGON2_PARALLELISM: z.coerce.number().int().min(1).max(16).default(4),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   VECTOR_EXTENSION_PATH: optionalString,
+  RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(10_000).default(5),
+  RATE_LIMIT_WINDOW: duration.default("1m"),
   AI_ENABLED: envBoolean(false),
   AI_API_BASE_URL: optionalUrl,
   AI_API_KEY: optionalString,
@@ -178,6 +188,10 @@ export function loadConfig(
     },
     logLevel: raw.LOG_LEVEL,
     vectorExtensionPath: raw.VECTOR_EXTENSION_PATH,
+    rateLimit: {
+      authMax: raw.RATE_LIMIT_AUTH_MAX,
+      windowMs: (parseDurationSeconds(raw.RATE_LIMIT_WINDOW) ?? 60) * 1_000,
+    },
     ai: {
       enabled: raw.AI_ENABLED,
       apiBaseUrl: raw.AI_API_BASE_URL,

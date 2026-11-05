@@ -6,5 +6,6 @@ export interface AppEnv {
     requestId: string;
     logger: Logger;
     userId?: string;
+    sessionId?: string;
   };
 }

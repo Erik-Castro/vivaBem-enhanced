@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fase 0 (fundação) concluída, versão `0.1.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação) e 1 (identidade) concluídas, versão `0.2.0`
 
 ---
 
@@ -44,23 +44,30 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-A Fase 0 está concluída (`0.1.0`). O que existe hoje:
+A Fase 0 está concluída (`0.1.0`) e a Fase 1 também (`0.2.0`). O que existe hoje:
 
 | Item | Estado |
 |---|---|
 | `src/config.ts` | env validado com Zod; única leitora de `Deno.env` |
 | `src/shared/logger/` | logger JSON com redação de dados sensíveis |
 | `src/http/` | `AppError`, handler de erros, OpenAPI, middlewares |
+| `src/http/cookies.ts` | cookies `vb_access`, `vb_refresh`, `vb_csrf` e flags |
+| `src/http/middleware/` | request-id, logger, body-limit, security-headers, CORS, CSRF, rate-limit, auth |
+| `src/shared/crypto/jwt.ts` | assinatura/verificação de access token HS256 |
+| `src/shared/crypto/tokens.ts` | token opaco, SHA-256, base64url, comparação constante |
+| `src/shared/utils/rate-limiter.ts` | janela deslizante em memória |
+| `src/modules/auth/` | repository, service e controller de identidade |
+| `src/modules/users/` | `/me`, preferências e sessões |
 | `src/db/client.ts` | conexão SQLite + extensão vetorial + transações |
 | `src/db/migrate.ts` | runner forward-only com checksum |
 | `src/db/migrations/001_core.sql` | tabelas de identidade |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
 | `src/main.ts` | bootstrap: config → migrações → servidor |
-| `tests/` | unitários e integração com SQLite real |
+| `tests/` | unitários e integração com SQLite real (62 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
-| `CHANGELOG.md` | Keep a Changelog, com `[Unreleased]` e `[0.1.0]` |
+| `CHANGELOG.md` | Keep a Changelog, com `[Unreleased]` e releases |
 | Docker/CI | `Dockerfile`, `.dockerignore`, `.github/workflows/ci.yml` |
 
 **Permissões do Deno:** `better-sqlite3` é um addon nativo e exige `--allow-ffi`; ele também consulta `process.report`/CPUs e exige `--allow-sys`. As tasks do `deno.json` já encapsulam as permissões necessárias. Nunca use `--allow-all`.
@@ -301,6 +308,7 @@ Regras:
 - Toda mudança visível entra em `[Unreleased]` no mesmo PR.
 - `CHANGELOG.md` e `deno.json` devem estar sincronizados.
 - Primeira release: `0.1.0` (2026-11-05), publicada ao concluir a Fase 0.
+- Segunda release: `0.2.0` (2026-11-05), publicada ao concluir a Fase 1.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -399,8 +407,8 @@ deno test --coverage
 | Fase | Entrega | Status |
 |---|---|---|
 | 0 | Fundação: config, logger, erros, DB, migrações, testes, CI, Docker, OpenAPI base | ✅ `0.1.0` |
-| 1 | Identidade: Argon2id, sessões/cookies/rotação, CSRF, rate limit, `/me` | ⏳ próximo |
-| 2 | Finanças: contas/cartão, categorias, transações/transferências/parcelas, resumos | ⬜ |
+| 1 | Identidade: Argon2id, sessões/cookies/rotação, CSRF, rate limit, `/me` | ✅ `0.2.0` |
+| 2 | Finanças: contas/cartão, categorias, transações/transferências/parcelas, resumos | ⏳ próximo |
 | 3 | Planejamento: recorrências, orçamentos + alertas, metas + contribuições | ⬜ |
 | 4 | Hábitos: CRUD, logs, streaks, calendário, triggers, stacking | ⬜ |
 | 5 | Investimentos: ativos, operações, posições, performance | ⬜ |
@@ -427,6 +435,12 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/db/migrate.ts` | Runner de migrações forward-only |
 | `src/app.ts` | Factory do Hono |
 | `src/main.ts` | Bootstrap da aplicação |
+| `src/http/cookies.ts` | Cookies de autenticação e CSRF |
+| `src/http/middleware/auth.ts` | Exige access token e sessão ativa |
+| `src/http/middleware/csrf.ts` | Double-submit + Origin/Sec-Fetch-Site |
+| `src/http/middleware/rate-limit.ts` | Rate limit por IP |
+| `src/modules/auth/` | Registro, login, refresh, logout, reuso |
+| `src/modules/users/` | Perfil, preferências e sessões |
 | `src/db/migrations/` | Migrações SQL numeradas |
 | `bin/sqlite-vector/` | Binários de fallback da extensão vetorial |
 | `Dockerfile` | Imagem multi-stage não-root |

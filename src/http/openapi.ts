@@ -78,6 +78,13 @@ export const readyRoute = createRoute({
 });
 
 export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppConfig): void {
+  app.openAPIRegistry.registerComponent("securitySchemes", "cookieAuth", {
+    type: "apiKey",
+    in: "cookie",
+    name: "vb_access",
+    description: "Access token JWT em cookie HttpOnly.",
+  });
+
   app.doc31(`/api/${API_VERSION}/openapi.json`, {
     openapi: "3.1.0",
     info: {
@@ -87,6 +94,10 @@ export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppCon
         "Todas as respostas de sucesso usam `{ data, meta }`; erros usam `{ error }`.",
     },
     servers: [{ url: config.appOrigin, description: config.env }],
-    tags: [{ name: "System", description: "Saúde e prontidão do serviço" }],
+    tags: [
+      { name: "System", description: "Saúde e prontidão do serviço" },
+      { name: "Auth", description: "Registro, login, refresh e logout" },
+      { name: "Users", description: "Perfil, preferências e sessões" },
+    ],
   });
 }

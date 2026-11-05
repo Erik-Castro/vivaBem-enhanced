@@ -11,6 +11,44 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.2.0] - 2026-11-05
+
+Segunda release: identidade e autenticação (Fase 1).
+
+### Added
+
+- `POST /api/v1/auth/register`, `/login`, `/refresh` e `/logout`.
+- `GET /api/v1/auth/csrf` para bootstrap do token CSRF.
+- Access token JWT HS256 em cookie `vb_access` (HttpOnly, SameSite=Lax, 15 min).
+- Refresh token opaco de 32 bytes em cookie `vb_refresh` (HttpOnly, Path
+  `/api/v1/auth`, 30 dias), com rotação de uso único.
+- Detecção de reuso de refresh: revoga a família inteira e registra
+  `auth_events.type = reuse_detected`.
+- Logout revoga a sessão, limpa cookies e invalida o access token de imediato.
+- CSRF double-submit (`vb_csrf` + `X-CSRF-Token`) e validação de
+  `Origin`/`Sec-Fetch-Site`.
+- Rate limit de janela deslizante por IP e por e-mail, com headers
+  `X-RateLimit-*` e `Retry-After`.
+- Hash Argon2id com parâmetros configuráveis e hash fictício para e-mails
+  inexistentes (tempo de resposta uniforme).
+- `GET/PATCH /api/v1/me`, `PATCH /api/v1/me/preferences`,
+  `GET /api/v1/me/sessions` e `DELETE /api/v1/me/sessions/{id}`.
+- Auditoria em `auth_events` para login, falha, refresh, logout e reuso.
+- Security scheme `cookieAuth` no OpenAPI e rotas protegidas documentadas.
+- Testes unitários de JWT, tokens e rate limiter; testes HTTP do fluxo
+  completo de autenticação (62 testes no total).
+
+### Changed
+
+- `RATE_LIMIT_AUTH_MAX` e `RATE_LIMIT_WINDOW` adicionados à configuração.
+- README e `AGENTS.md` atualizados para a Fase 1.
+
+### Security
+
+- Cookies `Secure` em produção e `SameSite=Lax` em todos os ambientes.
+- Respostas de login não revelam se o e-mail existe.
+- Rotas mutáveis exigem CSRF mesmo para clientes não-browser.
+
 ## [0.1.0] - 2026-11-05
 
 Primeira release: fundação da API (Fase 0).

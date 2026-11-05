@@ -36,14 +36,37 @@ deno task dev
 
 Servidor em `http://localhost:3000`:
 
-| Rota                       | Descrição                     |
-| -------------------------- | ----------------------------- |
-| `GET /health`              | Liveness                      |
-| `GET /ready`               | Readiness (banco + migrações) |
-| `GET /api/v1/openapi.json` | Documento OpenAPI 3.1         |
-| `GET /api/docs`            | Swagger UI                    |
+| Rota                             | Descrição                     |
+| -------------------------------- | ----------------------------- |
+| `GET /health`                    | Liveness                      |
+| `GET /ready`                     | Readiness (banco + migrações) |
+| `GET /api/v1/openapi.json`       | Documento OpenAPI 3.1         |
+| `GET /api/docs`                  | Swagger UI                    |
+| `GET /api/v1/auth/csrf`          | Bootstrap do token CSRF       |
+| `POST /api/v1/auth/register`     | Cria conta e inicia sessão    |
+| `POST /api/v1/auth/login`        | Autentica                     |
+| `POST /api/v1/auth/refresh`      | Rotaciona a sessão            |
+| `POST /api/v1/auth/logout`       | Encerra a sessão              |
+| `GET/PATCH /api/v1/me`           | Perfil do usuário             |
+| `PATCH /api/v1/me/preferences`   | Preferências regionais        |
+| `GET /api/v1/me/sessions`        | Sessões ativas                |
+| `DELETE /api/v1/me/sessions/:id` | Revoga uma sessão             |
 
 O banco é criado em `./data/app.db` e as migrações rodam no boot.
+
+## Autenticação
+
+O fluxo é baseado em cookies, sem tokens no corpo da resposta:
+
+1. `GET /api/v1/auth/csrf` define `vb_csrf` (legível pelo JS).
+2. `POST /api/v1/auth/register` ou `/login` define `vb_access` (JWT, 15 min) e `vb_refresh` (opaco,
+   30 dias) — ambos HttpOnly.
+3. Toda requisição mutável envia o header `X-CSRF-Token` com o valor de `vb_csrf`.
+4. `POST /api/v1/auth/refresh` rotaciona o refresh token; reutilizar um token já rotacionado revoga
+   a família inteira.
+
+Em produção os cookies usam `Secure`. Em desenvolvimento (`ENV=development`) rodando em HTTP,
+`COOKIE_SECURE=auto` mantém os cookies utilizáveis.
 
 ## Comandos
 
@@ -120,5 +143,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 
 ## Status
 
-Fase 0 (fundação) concluída. Próxima: Fase 1 (identidade e autenticação). Veja o roadmap em
+Fase 0 (fundação) e Fase 1 (identidade e autenticação) concluídas — versão atual `0.2.0`. Próxima:
+Fase 2 (finanças: contas, categorias, transações e resumos). Veja o roadmap em
 [`AGENTS.md`](AGENTS.md#16-roadmap).

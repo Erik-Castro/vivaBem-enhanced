@@ -21,6 +21,7 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
     ENV: "test",
     APP_ORIGIN: "http://localhost:3000",
     DATABASE_PATH: ":memory:",
+    RATE_LIMIT_AUTH_MAX: "1000",
     ...options.env,
   });
   const logger = createLogger({ level: "error", silent: true });
