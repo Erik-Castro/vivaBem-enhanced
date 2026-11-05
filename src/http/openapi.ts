@@ -109,6 +109,14 @@ export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppCon
         name: "Investments",
         description: "Ativos, operações, cotações, posições e performance",
       },
+      {
+        name: "Achievements",
+        description: "Catálogo de conquistas, desbloqueios e progresso",
+      },
+      {
+        name: "Notifications",
+        description: "Notificações do usuário, leitura e contagem",
+      },
     ],
   });
 }

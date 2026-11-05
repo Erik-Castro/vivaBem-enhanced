@@ -173,3 +173,41 @@ apagar operações destruiria histórico do usuário.
 **Consequência:** recadastrar um ticker removido é permitido, mas as operações
 antigas continuam preservadas e escopadas ao usuário; a conta usada em uma
 operação precisa pertencer ao usuário e ter a mesma moeda do ativo.
+
+## ADR-021 — Critérios de conquista em DSL declarativa
+
+**Decisão:** cada conquista referencia uma regra do catálogo declarativo
+(`criteria_rule`) e parâmetros JSON (`criteria_params`). A DSL cobre contagem,
+existência, soma, máximo, grupos, streaks, intervalos e condições compostas;
+datasets, colunas e ordenações vêm de listas fechadas e são validados por regex
+antes de entrar no SQL.
+**Motivo:** substituir dezenas de avaliadores bespoke por um motor único,
+testável e auditável, mantendo as 106 regras legadas sem SQL solto no service.
+**Consequência:** adicionar uma métrica exige uma nova primitiva na DSL ou um
+novo dataset — não um `SELECT` específico de conquista; parâmetros variáveis,
+como o dia da semana, ficam no registro da conquista.
+
+## ADR-022 — Avaliação preguiçosa e pós-mutação com desbloqueio idempotente
+
+**Decisão:** o progresso é recalculado nas leituras de `/achievements/me*` e,
+após uma mutação autenticada bem-sucedida, por um middleware que roda fora da
+transação da regra. Uma conquista já desbloqueada não é reavaliada; o motor faz
+até três passadas para que conquistas de meta reajam a desbloqueios da mesma
+execução.
+**Motivo:** o motor não pode acoplar cada service ao catálogo, nem perder
+desbloqueios quando o usuário não abre a tela; a idempotência evita
+notificações duplicadas e mantém `unlocked_at` estável.
+**Consequência:** falhas na avaliação são logadas e não quebram a mutação já
+respondida; `user_achievements (user_id, achievement_id)` é a barreira final
+contra duplicidade.
+
+## ADR-023 — Notificações escopadas e deduplicadas por título
+
+**Decisão:** notificações são gravadas com `user_id` da sessão, categoria e
+severidade fechadas; o desbloqueio usa o título estável
+`Conquista desbloqueada: <título>` para não notificar duas vezes. Toda leitura
+ou escrita é filtrada por `user_id`.
+**Motivo:** notificações são dados privados e o motor pode rodar repetidamente;
+escopo e chave natural eliminam vazamento entre usuários e ruído.
+**Consequência:** notificação de outro usuário responde `NOT_FOUND`, e a
+contagem de não lidas e o `read-all` nunca atravessam o escopo da sessão.

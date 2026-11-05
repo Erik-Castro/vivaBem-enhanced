@@ -196,12 +196,13 @@ erDiagram
 
     ACHIEVEMENTS {
         uuid id PK
-        string title
+        string title UK
         text description
         string category
         integer points_reward
         string badge_icon_url
         string criteria_rule
+        text criteria_params
         integer target_metric
         boolean is_hidden
         datetime created_at
@@ -214,6 +215,8 @@ erDiagram
         integer current_progress
         boolean is_unlocked
         datetime unlocked_at
+        datetime created_at
+        datetime updated_at
     }
 
     %% ==========================
@@ -270,7 +273,7 @@ erDiagram
         uuid user_id FK
         string title
         text message
-        string category "finance, habit, security, system"
+        string category "finance, habit, security, system, investment, family"
         string severity "low, medium, high, critical"
         string link
         boolean is_read

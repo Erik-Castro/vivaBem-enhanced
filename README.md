@@ -90,6 +90,13 @@ Servidor em `http://localhost:3000`:
 | `GET /api/v1/investments/portfolio`                      | Carteira consolidada               |
 | `GET /api/v1/investments/:id/performance`                | Posição, custo médio e P&L         |
 | `GET/POST /api/v1/investments/:id/quotes`                | Lista e registra cotações          |
+| `GET /api/v1/achievements`                               | Catálogo público de conquistas     |
+| `GET /api/v1/achievements/me`                            | Conquistas desbloqueadas           |
+| `GET /api/v1/achievements/me/progress`                   | Progresso de todas as conquistas   |
+| `GET /api/v1/notifications`                              | Lista notificações                 |
+| `GET /api/v1/notifications/unread-count`                 | Notificações não lidas             |
+| `PATCH /api/v1/notifications/:id/read`                   | Marca uma notificação como lida    |
+| `POST /api/v1/notifications/read-all`                    | Marca todas como lidas             |
 
 O banco é criado em `./data/app.db` e as migrações rodam no boot.
 
@@ -159,7 +166,7 @@ Detalhes de Portainer, backup e restore: [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ```text
 src/
-  main.ts          # bootstrap: config → migrações → servidor
+  main.ts          # bootstrap: config → migrações → seed → servidor
   app.ts           # factory do Hono (sem efeitos colaterais)
   config.ts        # env validado com Zod
   version.ts       # versão lida do deno.json
@@ -182,6 +189,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 
 ## Status
 
-Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos) e 5 (investimentos)
-concluídas — versão atual `0.6.0`. Próxima: Fase 6 (engajamento: conquistas e notificações). Veja o
-roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
+Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos) e
+6 (engajamento) concluídas — versão atual `0.7.0`. Próxima: Fase 7 (eventos + IA). Veja o roadmap em
+[`AGENTS.md`](AGENTS.md#16-roadmap).

@@ -11,6 +11,58 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.7.0] - 2026-11-05
+
+Sétima release: engajamento (Fase 6).
+
+### Added
+
+- Migração `006_engagement.sql` com `achievements`, `user_achievements` e
+  `notifications`, com índices para avaliação por regra, progresso por usuário
+  e listagem cronológica de notificações.
+- Catálogo de 352 conquistas portado de `reference_only/`, com 106 regras
+  únicas e 22 conquistas ocultas.
+- DSL declarativa de critérios (`count`, `exists`, `sum`, `max`, `maxGroup`,
+  `maxGroupDays`, `streak`, `maxGroupStreak`, `rowStreak`, `sameValueStreak`,
+  `daysSince`, `ratioPredicate`, `maxRatioPredicate`, `uniform`,
+  `conditional`, `allOf`, `score`, `constant`) com datasets fechados e
+  validação de colunas/ordenação antes de montar o SQL.
+- `criteria_params` em JSON para conquistas que compartilham a regra e variam
+  um detalhe, como o dia da semana em `CONSECUTIVE_DAY_OF_WEEK`.
+- `GET /api/v1/achievements`, `GET /api/v1/achievements/me` e
+  `GET /api/v1/achievements/me/progress` com resumo de desbloqueadas, total e
+  pontos.
+- `GET /api/v1/notifications`, `GET /api/v1/notifications/unread-count`,
+  `PATCH /api/v1/notifications/{id}/read` e
+  `POST /api/v1/notifications/read-all`.
+- Seed idempotente do catálogo por título no boot e no helper de testes.
+- Avaliação preguiçosa nas leituras de conquistas e middleware pós-mutação para
+  desbloquear conquistas sem acoplar a regra de negócio ao motor.
+- Notificação de desbloqueio criada apenas na primeira conquista, com título
+  estável para deduplicação.
+- Testes de catálogo/seed, autorização, desbloqueio idempotente, escopo de
+  notificações, leitura e avaliação de todas as 106 regras (137 testes no
+  total).
+
+### Changed
+
+- `src/app.ts` monta `AchievementsRepository`/`AchievementsService` e
+  `NotificationsRepository`/`NotificationsService`, protege as rotas com
+  `requireAuth` e registra a avaliação pós-mutação.
+- OpenAPI ganhou as tags `Achievements` e `Notifications`.
+- `src/main.ts` semeia o catálogo depois das migrações.
+- README, `AGENTS.md`, `docs/DECISIONS.md`, `docs/PLAN.md` e
+  `docs/erDiagram.mmd` atualizados para a Fase 6.
+
+### Security
+
+- Conquistas e notificações são sempre escopadas pelo `user_id` da sessão;
+  marcar notificação de outro usuário retorna `NOT_FOUND`.
+- Nenhum SQL de critério interpola entrada de usuário: datasets, colunas e
+  ordenações vêm de listas validadas por regex.
+- Conquistas ocultas só aparecem depois de desbloqueadas; o catálogo público
+  não expõe a regra interna nem os parâmetros de avaliação.
+
 ## [0.6.0] - 2026-11-05
 
 Sexta release: investimentos (Fase 5).

@@ -44,6 +44,13 @@ import { registerHabitsRoutes } from "./modules/habits/habits.controller.ts";
 import { InvestmentsRepository } from "./modules/investments/investments.repository.ts";
 import { InvestmentsService } from "./modules/investments/investments.service.ts";
 import { registerInvestmentsRoutes } from "./modules/investments/investments.controller.ts";
+import { AchievementsRepository } from "./modules/achievements/achievements.repository.ts";
+import { AchievementsService } from "./modules/achievements/achievements.service.ts";
+import { registerAchievementsRoutes } from "./modules/achievements/achievements.controller.ts";
+import { NotificationsRepository } from "./modules/notifications/notifications.repository.ts";
+import { NotificationsService } from "./modules/notifications/notifications.service.ts";
+import { registerNotificationsRoutes } from "./modules/notifications/notifications.controller.ts";
+import { evaluateAchievementsAfterMutation } from "./http/middleware/achievement-evaluation.ts";
 import { SlidingWindowRateLimiter } from "./shared/utils/rate-limiter.ts";
 import { API_VERSION, APP_VERSION } from "./version.ts";
 
@@ -151,6 +158,17 @@ export function createApp({ db, config, logger }: AppDependencies) {
     preferences: repository,
   });
 
+  const notificationsRepository = new NotificationsRepository(db);
+  const notificationsService = new NotificationsService(notificationsRepository);
+
+  const achievementsRepository = new AchievementsRepository(db);
+  const achievementsService = new AchievementsService({
+    db,
+    repository: achievementsRepository,
+    notifications: notificationsRepository,
+    logger,
+  });
+
   app.use("*", csrfProtection(config));
   app.use("/api/v1/auth/register", rateLimit(rateLimiter, config, { scope: "auth-register" }));
   app.use("/api/v1/auth/login", rateLimit(rateLimiter, config, { scope: "auth-login" }));
@@ -176,6 +194,13 @@ export function createApp({ db, config, logger }: AppDependencies) {
   app.use("/api/v1/habit-triggers/*", requireAuth(repository, config));
   app.use("/api/v1/investments", requireAuth(repository, config));
   app.use("/api/v1/investments/*", requireAuth(repository, config));
+  app.use("/api/v1/achievements", requireAuth(repository, config));
+  app.use("/api/v1/achievements/*", requireAuth(repository, config));
+  app.use("/api/v1/notifications", requireAuth(repository, config));
+  app.use("/api/v1/notifications/*", requireAuth(repository, config));
+
+  // Registrado depois dos guards: quando `next()` retorna, `userId` já existe.
+  app.use("*", evaluateAchievementsAfterMutation(achievementsService, logger));
 
   app.openapi(healthRoute, (c) =>
     c.json(
@@ -234,6 +259,8 @@ export function createApp({ db, config, logger }: AppDependencies) {
   registerGoalsRoutes(app, { service: goalsService, config });
   registerHabitsRoutes(app, { service: habitsService, config });
   registerInvestmentsRoutes(app, { service: investmentsService, config });
+  registerAchievementsRoutes(app, { service: achievementsService, config });
+  registerNotificationsRoutes(app, { service: notificationsService, config });
 
   app.get("/api/docs", swaggerUI({ url: `/api/${API_VERSION}/openapi.json` }));
 

@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos) e 5 (investimentos) concluídas, versão `0.6.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos) e 6 (engajamento) concluídas, versão `0.7.0`
 
 ---
 
@@ -44,7 +44,7 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`) e 5 (`0.6.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`) e 6 (`0.7.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -66,6 +66,8 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`) e 5 (`0
 | `src/modules/goals/` | metas, contribuições e progresso |
 | `src/modules/habits/` | hábitos, logs, streaks, calendário e gatilhos |
 | `src/modules/investments/` | ativos, operações, cotações, posições e performance |
+| `src/modules/achievements/` | catálogo, DSL de critérios, progresso e desbloqueio |
+| `src/modules/notifications/` | notificações escopadas, leitura e contagem |
 | `src/shared/utils/date.ts` | datas de negócio, soma de meses com clamp, intervalos e dia ISO |
 | `src/db/client.ts` | conexão SQLite + extensão vetorial + transações |
 | `src/db/migrate.ts` | runner forward-only com checksum |
@@ -74,9 +76,10 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`) e 5 (`0
 | `src/db/migrations/003_planning.sql` | recorrências, orçamentos, metas e contribuições |
 | `src/db/migrations/004_habits.sql` | hábitos, logs diários e gatilhos |
 | `src/db/migrations/005_investments.sql` | ativos, operações e cotações |
+| `src/db/migrations/006_engagement.sql` | conquistas, progresso e notificações |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
-| `src/main.ts` | bootstrap: config → migrações → catch-up de recorrências → servidor |
-| `tests/` | unitários e integração com SQLite real (128 testes) |
+| `src/main.ts` | bootstrap: config → migrações → seed de conquistas → catch-up de recorrências → servidor |
+| `tests/` | unitários e integração com SQLite real (137 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
@@ -236,6 +239,36 @@ src/modules/<dominio>/
   posição e a carteira. O ativo usa soft delete via `deleted_at` e o ticker é
   único por usuário apenas entre ativos vivos (case-insensitive).
 
+### 5.7 Engajamento (Fase 6)
+
+- O catálogo tem 352 conquistas (22 ocultas) e 106 regras únicas, portadas de
+  `reference_only/`; o seed é idempotente pelo título.
+- Cada conquista referencia uma regra da DSL (`achievements.criteria.ts`) e
+  parâmetros JSON (`criteria_params`), usados hoje apenas pelo dia da semana de
+  `CONSECUTIVE_DAY_OF_WEEK`.
+- A DSL cobre `count`, `exists`, `sum`, `max`, `maxGroup`, `maxGroupDays`,
+  `streak`, `maxGroupStreak`, `rowStreak`, `sameValueStreak`, `daysSince`,
+  `ratioPredicate`, `maxRatioPredicate`, `uniform`, `conditional`, `allOf`,
+  `score` e `constant`.
+- Streaks usam `day`, `businessDay`, `week` ou `month`, com uma unidade de
+  tolerância para não quebrar o período corrente antes de ele terminar; datas
+  são avaliadas em UTC.
+- Datasets, colunas e ordenações vêm de listas fechadas e passam por regex
+  antes de entrar no SQL; nenhuma regra interpola entrada de usuário ou
+  específica um `SELECT` no service.
+- A avaliação é preguiçosa em `GET /achievements/me*` e roda após mutações
+  autenticadas bem-sucedidas, fora da transação da regra, com até três passadas
+  para conquistas de meta. Falha de avaliação é logada e não quebra a resposta.
+- `user_achievements` tem unicidade `(user_id, achievement_id)`; uma conquista
+  já desbloqueada não é reavaliada e `unlocked_at` não muda.
+- O primeiro desbloqueio cria uma notificação com título estável
+  `Conquista desbloqueada: <título>`, categoria da conquista e severidade por
+  faixa de pontos; títulos repetidos não geram nova notificação.
+- Toda leitura/escrita de notificação é escopada por `user_id` da sessão;
+  acesso cruzado retorna `NOT_FOUND` e `read-all` não atravessa o escopo.
+- O catálogo público (`GET /achievements`) esconde conquistas ocultas e não
+  expõe `criteria_rule` nem `criteria_params`; o resumo usa o total de 352.
+
 ---
 
 ## 6. Convenções de código
@@ -389,6 +422,7 @@ Regras:
 - Quarta release: `0.4.0` (2026-11-05), publicada ao concluir a Fase 3.
 - Quinta release: `0.5.0` (2026-11-05), publicada ao concluir a Fase 4.
 - Sexta release: `0.6.0` (2026-11-05), publicada ao concluir a Fase 5.
+- Sétima release: `0.7.0` (2026-11-05), publicada ao concluir a Fase 6.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -492,8 +526,8 @@ deno test --coverage
 | 3 | Planejamento: recorrências, orçamentos + alertas, metas + contribuições | ✅ `0.4.0` |
 | 4 | Hábitos: CRUD, logs, streaks, calendário, triggers, stacking | ✅ `0.5.0` |
 | 5 | Investimentos: ativos, operações, posições, performance | ✅ `0.6.0` |
-| 6 | Engajamento: catálogo + DSL de critérios, notificações | ⏳ próximo |
-| 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ⬜ |
+| 6 | Engajamento: catálogo + DSL de critérios, notificações | ✅ `0.7.0` |
+| 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ⏳ próximo |
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ⬜ |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ⬜ |
 | 10 | Frontend Svelte 5 + Vite/PWA | ⬜ |
@@ -529,6 +563,9 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/modules/goals/` | Metas, contribuições e progresso |
 | `src/modules/habits/` | Hábitos, logs, streaks, calendário e gatilhos |
 | `src/modules/investments/` | Ativos, operações, cotações, posições e performance |
+| `src/modules/achievements/` | Catálogo, DSL de critérios, progresso e desbloqueio |
+| `src/modules/notifications/` | Notificações escopadas, leitura e contagem |
+| `src/http/middleware/achievement-evaluation.ts` | Avaliação após mutações autenticadas |
 | `src/db/migrations/` | Migrações SQL numeradas |
 | `bin/sqlite-vector/` | Binários de fallback da extensão vetorial |
 | `Dockerfile` | Imagem multi-stage não-root |

@@ -352,8 +352,8 @@ Makefile
 
 | Tabela | Colunas principais |
 |---|---|
-| `achievements` | `id`, `title`, `description`, `category`, `points_reward`, `badge_icon_url`, `criteria_rule`, `target_metric`, `is_hidden`, `created_at` |
-| `user_achievements` | `id`, `user_id`, `achievement_id`, `current_progress`, `is_unlocked`, `unlocked_at` (unique `user_id + achievement_id`) |
+| `achievements` | `id`, `title` (único), `description`, `category` (`finance`, `habit`, `investment`, `system`), `points_reward`, `badge_icon_url`, `criteria_rule`, `criteria_params` (JSON), `target_metric`, `is_hidden`, `created_at` |
+| `user_achievements` | `id`, `user_id`, `achievement_id`, `current_progress`, `is_unlocked`, `unlocked_at` (unique `user_id + achievement_id`, coerência entre `is_unlocked` e `unlocked_at`) |
 | `notifications` | `id`, `user_id`, `title`, `message`, `category` (`finance`, `habit`, `security`, `system`, `investment`, `family`), `severity` (`low`, `medium`, `high`, `critical`), `link`, `is_read`, `created_at` |
 
 #### Colaboração
@@ -386,6 +386,8 @@ Makefile
 - `goals(user_id, status)`
 - `goal_contributions(goal_id, contribution_date)`
 - `notifications(user_id, is_read, created_at DESC)`
+- `achievements(criteria_rule)`
+- `user_achievements(user_id, is_unlocked, unlocked_at DESC)`
 - `ai_insights(user_id, is_read, created_at DESC)`
 - `event_outbox(status, available_at, priority DESC)`
 - `user_sessions(refresh_token_hash)` (unique), `user_sessions(user_id, expires_at)`
@@ -783,4 +785,5 @@ deno task release -- patch|minor|major
 
 ## 16. Próximo passo
 
-Iniciar a **Fase 0** na ordem: higiene → núcleo → testes/CI/Docker → spikes → release `0.1.0`.
+Iniciar a **Fase 7** (eventos + IA): outbox transacional, worker com claim/lease,
+provider OpenAI-compatible, prompts, tools/executor, insights e embeddings.

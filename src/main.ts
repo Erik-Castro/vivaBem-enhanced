@@ -9,6 +9,7 @@ import { RecurringService } from "./modules/recurring/recurring.service.ts";
 import { TransactionsRepository } from "./modules/transactions/transactions.repository.ts";
 import { AccountsRepository } from "./modules/accounts/accounts.repository.ts";
 import { CategoriesRepository } from "./modules/categories/categories.repository.ts";
+import { seedAchievements } from "./modules/achievements/achievements.seed.ts";
 
 const encoder = new TextEncoder();
 
@@ -56,6 +57,19 @@ try {
 }
 
 const app = createApp({ db, config, logger });
+
+// Catálogo de conquistas é idempotente por título: reiniciar não duplica.
+try {
+  const seeded = seedAchievements(db);
+  logger.info("achievements_seeded", {
+    inserted: seeded.inserted,
+    total: seeded.total,
+  });
+} catch (error) {
+  logger.error("achievements_seed_failed", {
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
 
 // Catch-up de recorrências vencidas: o processo pode ter ficado parado entre
 // execuções, então materializamos o que já passou antes de aceitar tráfego.
