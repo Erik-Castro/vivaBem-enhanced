@@ -39,6 +39,7 @@ export const TransactionSchema = z
     categoryId: z.string().nullable(),
     categoryName: z.string().nullable(),
     transferGroupId: z.string().nullable(),
+    recurringTransactionId: z.string().nullable(),
     type: TransactionTypeSchema,
     amountMinor: z.number().int(),
     currencyCode: z.string(),

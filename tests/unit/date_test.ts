@@ -1,5 +1,15 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { addMonthsClamped, isValidBusinessDate, todayUtc } from "../../src/shared/utils/date.ts";
+import {
+  addDays,
+  addMonthsClamped,
+  addMonthsWithDay,
+  dayOfMonth,
+  daysBetween,
+  isValidBusinessDate,
+  monthBounds,
+  todayUtc,
+  yearBounds,
+} from "../../src/shared/utils/date.ts";
 
 Deno.test("isValidBusinessDate aceita datas reais", () => {
   assertEquals(isValidBusinessDate("2026-01-31"), true);
@@ -37,4 +47,39 @@ Deno.test("addMonthsClamped rejeita data e deslocamento inválidos", () => {
 Deno.test("todayUtc devolve YYYY-MM-DD", () => {
   assertEquals(todayUtc(new Date("2026-11-05T23:59:59Z")), "2026-11-05");
   assertEquals(todayUtc(new Date("2026-01-01T00:00:00Z")), "2026-01-01");
+});
+
+Deno.test("addMonthsWithDay mantém o dia-alvo entre meses", () => {
+  assertEquals(addMonthsWithDay("2026-01-31", 1, 31), "2026-02-28");
+  assertEquals(addMonthsWithDay("2026-02-28", 1, 31), "2026-03-31");
+  assertEquals(addMonthsWithDay("2026-01-15", 1, 15), "2026-02-15");
+  assertEquals(addMonthsWithDay("2025-12-31", 1, 31), "2026-01-31");
+  assertEquals(addMonthsWithDay("2026-01-31", 12, 31), "2027-01-31");
+});
+
+Deno.test("addMonthsWithDay rejeita dia-alvo inválido", () => {
+  assertThrows(() => addMonthsWithDay("2026-01-01", 1, 0), RangeError);
+  assertThrows(() => addMonthsWithDay("2026-01-01", 1, 32), RangeError);
+  assertThrows(() => addMonthsWithDay("2026-02-30", 1, 15), RangeError);
+});
+
+Deno.test("addDays atravessa meses e anos", () => {
+  assertEquals(addDays("2026-01-31", 1), "2026-02-01");
+  assertEquals(addDays("2026-12-31", 1), "2027-01-01");
+  assertEquals(addDays("2026-01-01", -1), "2025-12-31");
+  assertEquals(addDays("2024-02-28", 1), "2024-02-29");
+});
+
+Deno.test("monthBounds e yearBounds devolvem o intervalo fechado", () => {
+  assertEquals(monthBounds("2026-02-15"), { from: "2026-02-01", to: "2026-02-28" });
+  assertEquals(monthBounds("2024-02-15"), { from: "2024-02-01", to: "2024-02-29" });
+  assertEquals(monthBounds("2026-12-01"), { from: "2026-12-01", to: "2026-12-31" });
+  assertEquals(yearBounds("2026-07-01"), { from: "2026-01-01", to: "2026-12-31" });
+});
+
+Deno.test("daysBetween e dayOfMonth são consistentes", () => {
+  assertEquals(daysBetween("2026-01-01", "2026-01-31"), 30);
+  assertEquals(daysBetween("2026-01-31", "2026-01-01"), -30);
+  assertEquals(daysBetween("2024-02-28", "2024-03-01"), 2);
+  assertEquals(dayOfMonth("2026-11-05"), 5);
 });

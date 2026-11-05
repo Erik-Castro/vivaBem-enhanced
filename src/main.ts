@@ -4,6 +4,11 @@ import { createDatabase } from "./db/client.ts";
 import { loadMigrations, migrate, MigrationError } from "./db/migrate.ts";
 import { createApp } from "./app.ts";
 import { APP_VERSION } from "./version.ts";
+import { RecurringRepository } from "./modules/recurring/recurring.repository.ts";
+import { RecurringService } from "./modules/recurring/recurring.service.ts";
+import { TransactionsRepository } from "./modules/transactions/transactions.repository.ts";
+import { AccountsRepository } from "./modules/accounts/accounts.repository.ts";
+import { CategoriesRepository } from "./modules/categories/categories.repository.ts";
 
 const encoder = new TextEncoder();
 
@@ -51,6 +56,24 @@ try {
 }
 
 const app = createApp({ db, config, logger });
+
+// Catch-up de recorrências vencidas: o processo pode ter ficado parado entre
+// execuções, então materializamos o que já passou antes de aceitar tráfego.
+try {
+  const recurringService = new RecurringService({
+    db,
+    repository: new RecurringRepository(db),
+    transactions: new TransactionsRepository(db),
+    accounts: new AccountsRepository(db),
+    categories: new CategoriesRepository(db),
+  });
+  const result = recurringService.processDue();
+  logger.info("recurring_due_processed", { ...result });
+} catch (error) {
+  logger.error("recurring_due_failed", {
+    message: error instanceof Error ? error.message : String(error),
+  });
+}
 
 const server = Deno.serve(
   {

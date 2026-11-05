@@ -11,6 +11,55 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.4.0] - 2026-11-05
+
+Quarta release: planejamento (Fase 3).
+
+### Added
+
+- Migração `003_planning.sql` com `recurring_transactions`,
+  `recurring_occurrences`, `budgets`, `goals` e `goal_contributions`, além da
+  coluna `transactions.recurring_transaction_id`, com índices e constraints.
+- `GET/POST /api/v1/recurring`, `GET/PATCH/DELETE /api/v1/recurring/{id}`,
+  `GET /api/v1/recurring/upcoming` e `POST /api/v1/recurring/{id}/run-now`.
+- Recorrências diárias, semanais, mensais e anuais com intervalo configurável,
+  dia-alvo preservado entre meses e término por data.
+- Ocorrências idempotentes por `(recurring_transaction_id, occurrence_date)`,
+  com catch-up no boot e limite de 500 ocorrências por recorrência por execução.
+- `GET/POST /api/v1/budgets`, `GET/PATCH/DELETE /api/v1/budgets/{id}` e
+  `GET /api/v1/budgets/status`.
+- Orçamentos mensais, anuais e personalizados, com consumo da subárvore inteira
+  da categoria, `alert_threshold` configurável e limiares fixos 80/90/100.
+- `GET/POST /api/v1/goals`, `GET/PATCH/DELETE /api/v1/goals/{id}`,
+  `GET /api/v1/goals/{id}/progress`, `POST /api/v1/goals/{id}/contributions` e
+  `DELETE /api/v1/goals/{id}/contributions/{contributionId}`.
+- Metas com contribuições, progresso, conclusão automática ao atingir o alvo e
+  reversão para `active` ao remover contribuição ou elevar o alvo.
+- Utilidades de datas `addMonthsWithDay`, `addDays`, `monthBounds`,
+  `yearBounds`, `daysBetween` e `dayOfMonth`.
+- Testes unitários das novas utilidades de data e 6 testes de integração de
+  planejamento (93 testes no total).
+- ADRs 013–015 sobre ocorrências idempotentes, consumo de orçamento e
+  contribuições de meta.
+
+### Changed
+
+- Transações passam a expor `recurringTransactionId` na API e no repositório.
+- `src/app.ts` monta os módulos de recorrências, orçamentos e metas atrás de
+  `requireAuth`.
+- `src/main.ts` executa o catch-up de recorrências vencidas antes de aceitar
+  tráfego.
+- OpenAPI ganhou as tags `Recurring`, `Budgets` e `Goals`.
+- README, `AGENTS.md` e `docs/DECISIONS.md` atualizados para a Fase 3.
+
+### Security
+
+- Recorrências, orçamentos e metas são sempre escopados pelo `user_id` da
+  sessão; acesso cruzado retorna `NOT_FOUND`.
+- Moeda de recorrência precisa coincidir com a da conta; moeda de meta é
+  imutável após contribuições.
+- Categorias de orçamento são validadas como despesa ativa do próprio usuário.
+
 ## [0.3.0] - 2026-11-05
 
 Terceira release: finanças (Fase 2).

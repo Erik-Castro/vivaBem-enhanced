@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação) e 1 (identidade) concluídas, versão `0.2.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças) e 3 (planejamento) concluídas, versão `0.4.0`
 
 ---
 
@@ -44,7 +44,7 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`) e 2 (`0.3.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`) e 3 (`0.4.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -61,14 +61,18 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`) e 2 (`0.3.0`) estão concluídas. O que existe
 | `src/modules/accounts/` | contas, cartões, saldo e limite disponível |
 | `src/modules/categories/` | categorias, árvore e desativação em cascata |
 | `src/modules/transactions/` | transações, transferências, parcelas e resumos |
-| `src/shared/utils/date.ts` | datas de negócio e soma de meses com clamp |
+| `src/modules/recurring/` | recorrências, ocorrências idempotentes e run-now |
+| `src/modules/budgets/` | orçamentos, consumo por subárvore e limiares |
+| `src/modules/goals/` | metas, contribuições e progresso |
+| `src/shared/utils/date.ts` | datas de negócio, soma de meses com clamp e intervalos |
 | `src/db/client.ts` | conexão SQLite + extensão vetorial + transações |
 | `src/db/migrate.ts` | runner forward-only com checksum |
 | `src/db/migrations/001_core.sql` | tabelas de identidade |
 | `src/db/migrations/002_finance.sql` | contas, cartões, categorias, transações e parcelas |
+| `src/db/migrations/003_planning.sql` | recorrências, orçamentos, metas e contribuições |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
-| `src/main.ts` | bootstrap: config → migrações → servidor |
-| `tests/` | unitários e integração com SQLite real (82 testes) |
+| `src/main.ts` | bootstrap: config → migrações → catch-up de recorrências → servidor |
+| `tests/` | unitários e integração com SQLite real (93 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
@@ -164,6 +168,20 @@ src/modules/<dominio>/
   <dominio>.repository.ts
   <dominio>.schemas.ts
 ```
+
+### 5.4 Planejamento (Fase 3)
+
+- Recorrências aceitam apenas `income`/`expense`; a materialização cria uma
+  transação e uma linha em `recurring_occurrences` na mesma transação.
+- `unique (recurring_transaction_id, occurrence_date)` garante idempotência;
+  catch-up no boot e `POST /recurring/{id}/run-now` compartilham o mesmo caminho.
+- Recorrências mensais/anuais mantêm o dia-alvo via `addMonthsWithDay` (31 vira
+  28/29/30 quando necessário) e são limitadas a 500 ocorrências por execução.
+- O consumo do orçamento soma a subárvore inteira da categoria; o nível usa o
+  `alert_threshold` configurável e os limiares fixos `[80, 90, 100]`.
+- Contribuições de meta têm soft delete (`deleted_at`) e são somadas apenas
+  quando ativas; a meta completa/reverte automaticamente conforme o total.
+- A moeda da meta é imutável depois da primeira contribuição.
 
 ---
 
@@ -315,6 +333,7 @@ Regras:
 - Primeira release: `0.1.0` (2026-11-05), publicada ao concluir a Fase 0.
 - Segunda release: `0.2.0` (2026-11-05), publicada ao concluir a Fase 1.
 - Terceira release: `0.3.0` (2026-11-05), publicada ao concluir a Fase 2.
+- Quarta release: `0.4.0` (2026-11-05), publicada ao concluir a Fase 3.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -415,8 +434,8 @@ deno test --coverage
 | 0 | Fundação: config, logger, erros, DB, migrações, testes, CI, Docker, OpenAPI base | ✅ `0.1.0` |
 | 1 | Identidade: Argon2id, sessões/cookies/rotação, CSRF, rate limit, `/me` | ✅ `0.2.0` |
 | 2 | Finanças: contas/cartão, categorias, transações/transferências/parcelas, resumos | ✅ `0.3.0` |
-| 3 | Planejamento: recorrências, orçamentos + alertas, metas + contribuições | ⏳ próximo |
-| 4 | Hábitos: CRUD, logs, streaks, calendário, triggers, stacking | ⬜ |
+| 3 | Planejamento: recorrências, orçamentos + alertas, metas + contribuições | ✅ `0.4.0` |
+| 4 | Hábitos: CRUD, logs, streaks, calendário, triggers, stacking | ⏳ próximo |
 | 5 | Investimentos: ativos, operações, posições, performance | ⬜ |
 | 6 | Engajamento: catálogo + DSL de critérios, notificações | ⬜ |
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ⬜ |
@@ -450,6 +469,9 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/modules/accounts/` | Contas, cartões, saldo e limite disponível |
 | `src/modules/categories/` | Categorias, árvore e desativação em cascata |
 | `src/modules/transactions/` | Transações, transferências, parcelas e resumos |
+| `src/modules/recurring/` | Recorrências, ocorrências e run-now |
+| `src/modules/budgets/` | Orçamentos, consumo por subárvore e limiares |
+| `src/modules/goals/` | Metas, contribuições e progresso |
 | `src/db/migrations/` | Migrações SQL numeradas |
 | `bin/sqlite-vector/` | Binários de fallback da extensão vetorial |
 | `Dockerfile` | Imagem multi-stage não-root |

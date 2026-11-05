@@ -29,6 +29,15 @@ import { registerCategoriesRoutes } from "./modules/categories/categories.contro
 import { TransactionsRepository } from "./modules/transactions/transactions.repository.ts";
 import { TransactionsService } from "./modules/transactions/transactions.service.ts";
 import { registerTransactionsRoutes } from "./modules/transactions/transactions.controller.ts";
+import { RecurringRepository } from "./modules/recurring/recurring.repository.ts";
+import { RecurringService } from "./modules/recurring/recurring.service.ts";
+import { registerRecurringRoutes } from "./modules/recurring/recurring.controller.ts";
+import { BudgetsRepository } from "./modules/budgets/budgets.repository.ts";
+import { BudgetsService } from "./modules/budgets/budgets.service.ts";
+import { registerBudgetsRoutes } from "./modules/budgets/budgets.controller.ts";
+import { GoalsRepository } from "./modules/goals/goals.repository.ts";
+import { GoalsService } from "./modules/goals/goals.service.ts";
+import { registerGoalsRoutes } from "./modules/goals/goals.controller.ts";
 import { SlidingWindowRateLimiter } from "./shared/utils/rate-limiter.ts";
 import { API_VERSION, APP_VERSION } from "./version.ts";
 
@@ -101,6 +110,30 @@ export function createApp({ db, config, logger }: AppDependencies) {
     categories: categoriesRepository,
   });
 
+  const recurringRepository = new RecurringRepository(db);
+  const recurringService = new RecurringService({
+    db,
+    repository: recurringRepository,
+    transactions: transactionsRepository,
+    accounts: accountsRepository,
+    categories: categoriesRepository,
+  });
+
+  const budgetsRepository = new BudgetsRepository(db);
+  const budgetsService = new BudgetsService({
+    repository: budgetsRepository,
+    categories: categoriesRepository,
+    preferences: repository,
+  });
+
+  const goalsRepository = new GoalsRepository(db);
+  const goalsService = new GoalsService({
+    db,
+    repository: goalsRepository,
+    accounts: accountsRepository,
+    preferences: repository,
+  });
+
   app.use("*", csrfProtection(config));
   app.use("/api/v1/auth/register", rateLimit(rateLimiter, config, { scope: "auth-register" }));
   app.use("/api/v1/auth/login", rateLimit(rateLimiter, config, { scope: "auth-login" }));
@@ -114,6 +147,12 @@ export function createApp({ db, config, logger }: AppDependencies) {
   app.use("/api/v1/categories/*", requireAuth(repository, config));
   app.use("/api/v1/transactions", requireAuth(repository, config));
   app.use("/api/v1/transactions/*", requireAuth(repository, config));
+  app.use("/api/v1/recurring", requireAuth(repository, config));
+  app.use("/api/v1/recurring/*", requireAuth(repository, config));
+  app.use("/api/v1/budgets", requireAuth(repository, config));
+  app.use("/api/v1/budgets/*", requireAuth(repository, config));
+  app.use("/api/v1/goals", requireAuth(repository, config));
+  app.use("/api/v1/goals/*", requireAuth(repository, config));
 
   app.openapi(healthRoute, (c) =>
     c.json(
@@ -167,6 +206,9 @@ export function createApp({ db, config, logger }: AppDependencies) {
   });
   registerCategoriesRoutes(app, { service: categoriesService, config });
   registerTransactionsRoutes(app, { service: transactionsService, config });
+  registerRecurringRoutes(app, { service: recurringService, config });
+  registerBudgetsRoutes(app, { service: budgetsService, config });
+  registerGoalsRoutes(app, { service: goalsService, config });
 
   app.get("/api/docs", swaggerUI({ url: `/api/${API_VERSION}/openapi.json` }));
 

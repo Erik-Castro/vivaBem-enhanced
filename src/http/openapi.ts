@@ -101,6 +101,9 @@ export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppCon
       { name: "Accounts", description: "Contas, cartões e saldos" },
       { name: "Categories", description: "Categorias e árvore de categorias" },
       { name: "Transactions", description: "Transações, transferências e resumos" },
+      { name: "Recurring", description: "Recorrências e próximas ocorrências" },
+      { name: "Budgets", description: "Orçamentos, limites e alertas" },
+      { name: "Goals", description: "Metas e contribuições" },
     ],
   });
 }

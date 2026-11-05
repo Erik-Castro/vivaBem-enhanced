@@ -19,6 +19,7 @@ export interface Transaction {
   readonly categoryId: string | null;
   readonly categoryName: string | null;
   readonly transferGroupId: string | null;
+  readonly recurringTransactionId: string | null;
   readonly type: TransactionType;
   readonly amountMinor: number;
   readonly currencyCode: string;
@@ -37,6 +38,7 @@ interface TransactionRow {
   account_id: string;
   category_id: string | null;
   transfer_group_id: string | null;
+  recurring_transaction_id: string | null;
   type: TransactionType;
   amount_minor: number;
   currency_code: string;
@@ -61,6 +63,8 @@ export interface CreateTransactionRecord {
   readonly accountId: string;
   readonly categoryId: string | null;
   readonly transferGroupId: string | null;
+  /** Presente quando a transação foi materializada por uma recorrência. */
+  readonly recurringTransactionId?: string | null;
   readonly type: TransactionType;
   readonly amountMinor: number;
   readonly currencyCode: string;
@@ -149,13 +153,14 @@ export class TransactionsRepository {
           string | null,
           string,
           string,
+          string | null,
         ]
       >(
         `INSERT INTO transactions
            (id, account_id, category_id, transfer_group_id, type, amount_minor,
             currency_code, description, transaction_date, is_cleared, external_id,
-            import_hash, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            import_hash, created_at, updated_at, recurring_transaction_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.id,
@@ -172,6 +177,7 @@ export class TransactionsRepository {
         record.importHash,
         record.now,
         record.now,
+        record.recurringTransactionId ?? null,
       );
   }
 
@@ -362,6 +368,7 @@ function mapTransaction(row: TransactionRow): Transaction {
     categoryId: row.category_id,
     categoryName: row.category_name,
     transferGroupId: row.transfer_group_id,
+    recurringTransactionId: row.recurring_transaction_id,
     type: row.type,
     amountMinor: row.amount_minor,
     currencyCode: row.currency_code,

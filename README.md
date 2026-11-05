@@ -36,33 +36,45 @@ deno task dev
 
 Servidor em `http://localhost:3000`:
 
-| Rota                                        | Descrição                     |
-| ------------------------------------------- | ----------------------------- |
-| `GET /health`                               | Liveness                      |
-| `GET /ready`                                | Readiness (banco + migrações) |
-| `GET /api/v1/openapi.json`                  | Documento OpenAPI 3.1         |
-| `GET /api/docs`                             | Swagger UI                    |
-| `GET /api/v1/auth/csrf`                     | Bootstrap do token CSRF       |
-| `POST /api/v1/auth/register`                | Cria conta e inicia sessão    |
-| `POST /api/v1/auth/login`                   | Autentica                     |
-| `POST /api/v1/auth/refresh`                 | Rotaciona a sessão            |
-| `POST /api/v1/auth/logout`                  | Encerra a sessão              |
-| `GET/PATCH /api/v1/me`                      | Perfil do usuário             |
-| `PATCH /api/v1/me/preferences`              | Preferências regionais        |
-| `GET /api/v1/me/sessions`                   | Sessões ativas                |
-| `DELETE /api/v1/me/sessions/:id`            | Revoga uma sessão             |
-| `GET/POST /api/v1/accounts`                 | Lista e cria contas           |
-| `GET/PATCH/DELETE /api/v1/accounts/:id`     | Detalhe, edição e desativação |
-| `GET /api/v1/accounts/:id/balance`          | Saldo e limite disponível     |
-| `GET /api/v1/accounts/:id/transactions`     | Extrato da conta              |
-| `GET/POST /api/v1/categories`               | Lista e cria categorias       |
-| `GET /api/v1/categories/tree`               | Árvore de categorias          |
-| `GET/PATCH/DELETE /api/v1/categories/:id`   | Detalhe, edição e desativação |
-| `GET/POST /api/v1/transactions`             | Lista e cria transações       |
-| `GET/PATCH/DELETE /api/v1/transactions/:id` | Detalhe, edição e remoção     |
-| `GET /api/v1/transactions/summary`          | Resumo por moeda e categoria  |
-| `POST /api/v1/transactions/transfer`        | Transferência entre contas    |
-| `POST /api/v1/transactions/:id/clear`       | Marca como compensada         |
+| Rota                                                     | Descrição                        |
+| -------------------------------------------------------- | -------------------------------- |
+| `GET /health`                                            | Liveness                         |
+| `GET /ready`                                             | Readiness (banco + migrações)    |
+| `GET /api/v1/openapi.json`                               | Documento OpenAPI 3.1            |
+| `GET /api/docs`                                          | Swagger UI                       |
+| `GET /api/v1/auth/csrf`                                  | Bootstrap do token CSRF          |
+| `POST /api/v1/auth/register`                             | Cria conta e inicia sessão       |
+| `POST /api/v1/auth/login`                                | Autentica                        |
+| `POST /api/v1/auth/refresh`                              | Rotaciona a sessão               |
+| `POST /api/v1/auth/logout`                               | Encerra a sessão                 |
+| `GET/PATCH /api/v1/me`                                   | Perfil do usuário                |
+| `PATCH /api/v1/me/preferences`                           | Preferências regionais           |
+| `GET /api/v1/me/sessions`                                | Sessões ativas                   |
+| `DELETE /api/v1/me/sessions/:id`                         | Revoga uma sessão                |
+| `GET/POST /api/v1/accounts`                              | Lista e cria contas              |
+| `GET/PATCH/DELETE /api/v1/accounts/:id`                  | Detalhe, edição e desativação    |
+| `GET /api/v1/accounts/:id/balance`                       | Saldo e limite disponível        |
+| `GET /api/v1/accounts/:id/transactions`                  | Extrato da conta                 |
+| `GET/POST /api/v1/categories`                            | Lista e cria categorias          |
+| `GET /api/v1/categories/tree`                            | Árvore de categorias             |
+| `GET/PATCH/DELETE /api/v1/categories/:id`                | Detalhe, edição e desativação    |
+| `GET/POST /api/v1/transactions`                          | Lista e cria transações          |
+| `GET/PATCH/DELETE /api/v1/transactions/:id`              | Detalhe, edição e remoção        |
+| `GET /api/v1/transactions/summary`                       | Resumo por moeda e categoria     |
+| `POST /api/v1/transactions/transfer`                     | Transferência entre contas       |
+| `POST /api/v1/transactions/:id/clear`                    | Marca como compensada            |
+| `GET/POST /api/v1/recurring`                             | Lista e cria recorrências        |
+| `GET /api/v1/recurring/upcoming`                         | Próximas ocorrências previstas   |
+| `GET/PATCH/DELETE /api/v1/recurring/:id`                 | Detalhe, edição e desativação    |
+| `POST /api/v1/recurring/:id/run-now`                     | Materializa a próxima ocorrência |
+| `GET/POST /api/v1/budgets`                               | Lista e cria orçamentos          |
+| `GET /api/v1/budgets/status`                             | Consumo, saldo e limiares        |
+| `GET/PATCH/DELETE /api/v1/budgets/:id`                   | Detalhe, edição e desativação    |
+| `GET/POST /api/v1/goals`                                 | Lista e cria metas               |
+| `GET/PATCH/DELETE /api/v1/goals/:id`                     | Detalhe, edição e cancelamento   |
+| `GET /api/v1/goals/:id/progress`                         | Progresso e contribuições        |
+| `POST /api/v1/goals/:id/contributions`                   | Registra contribuição            |
+| `DELETE /api/v1/goals/:id/contributions/:contributionId` | Remove contribuição              |
 
 O banco é criado em `./data/app.db` e as migrações rodam no boot.
 
@@ -155,6 +167,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 
 ## Status
 
-Fases 0 (fundação), 1 (identidade) e 2 (finanças) concluídas — versão atual `0.3.0`. Próxima: Fase 3
-(planejamento: recorrências, orçamentos e metas). Veja o roadmap em
-[`AGENTS.md`](AGENTS.md#16-roadmap).
+Fases 0 (fundação), 1 (identidade), 2 (finanças) e 3 (planejamento) concluídas — versão atual
+`0.4.0`. Próxima: Fase 4 (hábitos: logs, streaks, calendário, triggers e stacking). Veja o roadmap
+em [`AGENTS.md`](AGENTS.md#16-roadmap).

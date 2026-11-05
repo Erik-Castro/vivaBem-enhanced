@@ -88,3 +88,33 @@ existirem transações.
 **Motivo:** misturar moedas no mesmo livro-razão quebraria somas e resumos.
 **Consequência:** transferências entre moedas diferentes são rejeitadas nesta
 fase; conversão cambial fica para uma fase futura.
+
+## ADR-013 — Ocorrências de recorrência idempotentes
+
+**Decisão:** cada materialização grava uma transação e uma linha em
+`recurring_occurrences`, com unique em
+`(recurring_transaction_id, occurrence_date)`; a transação usa o mesmo
+`db.transaction`.
+**Motivo:** catch-up no boot, `run-now` e reprocessamentos não podem duplicar
+lançamentos.
+**Consequência:** o avanço de `next_occurrence` é monotônico e o catch-up é
+limitado a 500 ocorrências por recorrência em cada execução.
+
+## ADR-014 — Orçamento soma a subárvore da categoria
+
+**Decisão:** o consumo usa CTE recursiva sobre as categorias filhas; o nível
+combina o `alert_threshold` configurável com os limiares fixos 80/90/100.
+**Motivo:** orçamentos de categoria pai precisam cobrir gastos lançados nas
+filhas, e os alertas devem ser previsíveis para a UI.
+**Consequência:** mover uma transação para outra subárvore altera o consumo;
+categorias de receita/transferência não são aceitas em orçamentos.
+
+## ADR-015 — Contribuições de meta com soft delete e status automático
+
+**Decisão:** contribuições são registradas em `goal_contributions` e removidas
+com `deleted_at`; o status vira `completed` ao atingir o alvo e volta a
+`active` quando o total cai abaixo dele.
+**Motivo:** preservar histórico e evitar que uma remoção acidental apague
+dados do usuário.
+**Consequência:** a moeda da meta é imutável após a primeira contribuição e
+`DELETE /goals/{id}` apenas cancela a meta.
