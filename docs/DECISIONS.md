@@ -139,3 +139,37 @@ remove em cascata os gatilhos relacionados.
 de hábitos inativos.
 **Consequência:** o hábito ruim é imutável no update do gatilho e a
 substituição precisa ser um hábito bom ativo distinto.
+
+## ADR-018 — Custo médio ponderado com dinheiro inteiro
+
+**Decisão:** `investment_transactions.quantity` é `REAL` (ativos fracionários),
+mas preços, taxas e todos os totais monetários são inteiros em minor units. O
+custo médio é ponderado: compras somam preço + taxas à base de custo, vendas
+removem a fração proporcional e realizam `bruto - taxas - custo removido`.
+**Motivo:** o domínio permite frações de ação/cripto, mas usar float para
+dinheiro reintroduziria o erro de arredondamento que a reescrita eliminou.
+**Consequência:** o cálculo é uma função pura (`investments.performance.ts`),
+testável sem banco, e qualquer venda acima da posição é rejeitada antes do
+insert.
+
+## ADR-019 — Cotação explícita e carteira parcialmente avaliada
+
+**Decisão:** `investment_quotes` guarda o histórico de preços e a cotação mais
+recente (por `quoted_at`, `created_at`, `rowid`) valoriza a posição. O P&L não
+realizado e o valor de mercado são `null` enquanto não houver cotação.
+**Motivo:** a API não depende de um provedor de mercado nesta fase; o usuário
+pode registrar cotações manualmente e a UI distingue posição sem preço.
+**Consequência:** `GET /investments/portfolio` soma apenas posições
+valorizadas e marca `valuationComplete = false` quando existe posição aberta
+sem cotação.
+
+## ADR-020 — Moeda imutável e soft delete do ativo
+
+**Decisão:** a moeda do ativo é imutável depois da primeira operação e o ativo
+é removido com `deleted_at`; o ticker é único por usuário apenas entre ativos
+vivos (case-insensitive).
+**Motivo:** misturar moedas na mesma posição quebraria custo médio e P&L, e
+apagar operações destruiria histórico do usuário.
+**Consequência:** recadastrar um ticker removido é permitido, mas as operações
+antigas continuam preservadas e escopadas ao usuário; a conta usada em uma
+operação precisa pertencer ao usuário e ter a mesma moeda do ativo.

@@ -105,6 +105,10 @@ export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppCon
       { name: "Budgets", description: "Orçamentos, limites e alertas" },
       { name: "Goals", description: "Metas e contribuições" },
       { name: "Habits", description: "Hábitos, logs, streaks, calendário e gatilhos" },
+      {
+        name: "Investments",
+        description: "Ativos, operações, cotações, posições e performance",
+      },
     ],
   });
 }

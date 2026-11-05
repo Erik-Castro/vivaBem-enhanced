@@ -344,9 +344,9 @@ Makefile
 
 | Tabela | Colunas principais |
 |---|---|
-| `investments` | `id`, `user_id`, `ticker`, `name`, `asset_class`, `currency_code`, `created_at`, `updated_at` |
-| `investment_transactions` | `id`, `investment_id`, `account_id`, `operation_type` (`buy`, `sell`, `dividend`, `fee`), `quantity`, `unit_price_minor`, `fees_minor`, `operation_date`, `created_at` |
-| `investment_quotes` | `id`, `investment_id`, `price_minor`, `quoted_at`, `source` |
+| `investments` | `id`, `user_id`, `ticker`, `name`, `asset_class`, `currency_code`, `deleted_at`, `created_at`, `updated_at` (unique `user_id + ticker` entre ativos vivos) |
+| `investment_transactions` | `id`, `investment_id`, `account_id`, `operation_type` (`buy`, `sell`, `dividend`, `fee`), `quantity` (REAL), `unit_price_minor`, `fees_minor`, `operation_date`, `created_at` |
+| `investment_quotes` | `id`, `investment_id`, `price_minor`, `quoted_at`, `source`, `created_at` |
 
 #### Engajamento
 
@@ -495,7 +495,7 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 | Budgets | `GET/POST /budgets`, `GET/PATCH/DELETE /budgets/:id`, `GET /budgets/status` |
 | Goals | `GET/POST /goals`, `GET/PATCH/DELETE /goals/:id`, `GET /goals/:id/progress`, `POST /goals/:id/contributions`, `DELETE /goals/:id/contributions/:contributionId` |
 | Habits | `GET/POST /habits`, `GET/PATCH/DELETE /habits/:id`, `POST /habits/:id/logs`, `GET /habits/:id/logs`, `DELETE /habits/:id/logs/:logId`, `GET /habits/:id/streak`, `GET /habits/:id/calendar`, `POST /habits/:id/reorder`, `GET/POST /habit-triggers`, `PATCH/DELETE /habit-triggers/:id` |
-| Investments | `GET/POST /investments`, `GET/PATCH/DELETE /investments/:id`, `GET/POST /investments/:id/transactions`, `GET /investments/portfolio`, `GET /investments/:id/performance` |
+| Investments | `GET/POST /investments`, `GET/PATCH/DELETE /investments/:id`, `GET/POST /investments/:id/transactions`, `GET/POST /investments/:id/quotes`, `GET /investments/portfolio`, `GET /investments/:id/performance` |
 | Achievements | `GET /achievements`, `GET /achievements/me`, `GET /achievements/me/progress` |
 | Notifications | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/:id/read`, `POST /notifications/read-all` |
 | Family | `POST /family/invite`, `POST /family/accept`, `GET /family/link`, `DELETE /family/link` |

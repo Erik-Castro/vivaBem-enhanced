@@ -84,6 +84,12 @@ Servidor em `http://localhost:3000`:
 | `GET /api/v1/habits/:id/calendar`                        | Calendário de cumprimento          |
 | `GET/POST /api/v1/habit-triggers`                        | Lista e cria gatilhos              |
 | `PATCH/DELETE /api/v1/habit-triggers/:id`                | Edita e remove gatilho             |
+| `GET/POST /api/v1/investments`                           | Lista e cria ativos                |
+| `GET/PATCH/DELETE /api/v1/investments/:id`               | Detalhe, edição e remoção          |
+| `GET/POST /api/v1/investments/:id/transactions`          | Lista e registra operações         |
+| `GET /api/v1/investments/portfolio`                      | Carteira consolidada               |
+| `GET /api/v1/investments/:id/performance`                | Posição, custo médio e P&L         |
+| `GET/POST /api/v1/investments/:id/quotes`                | Lista e registra cotações          |
 
 O banco é criado em `./data/app.db` e as migrações rodam no boot.
 
@@ -176,6 +182,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 
 ## Status
 
-Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento) e 4 (hábitos) concluídas — versão
-atual `0.5.0`. Próxima: Fase 5 (investimentos: ativos, operações, posições e performance). Veja o
+Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos) e 5 (investimentos)
+concluídas — versão atual `0.6.0`. Próxima: Fase 6 (engajamento: conquistas e notificações). Veja o
 roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).

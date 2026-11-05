@@ -11,6 +11,49 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.6.0] - 2026-11-05
+
+Sexta release: investimentos (Fase 5).
+
+### Added
+
+- Migração `005_investments.sql` com `investments`, `investment_transactions` e
+  `investment_quotes`, com índices, constraints de data/quantidade e unicidade
+  de ticker por usuário entre ativos não removidos.
+- `GET/POST /api/v1/investments`, `GET/PATCH/DELETE /api/v1/investments/{id}`.
+- `GET/POST /api/v1/investments/{id}/transactions` com os tipos `buy`, `sell`,
+  `dividend` e `fee`.
+- `GET /api/v1/investments/portfolio` com posições e totais consolidados por
+  moeda.
+- `GET /api/v1/investments/{id}/performance` com custo médio ponderado, P&L
+  realizado, dividendos, P&L não realizado e retorno percentual.
+- `GET/POST /api/v1/investments/{id}/quotes`; a cotação mais recente valoriza a
+  posição e a carteira.
+- Cálculo puro de posição com quantidades fracionárias, custo médio ponderado,
+  bloqueio de venda a descoberto e ordem determinística de operações no mesmo
+  dia.
+- Testes unitários de posição/P&L e 5 testes de integração de investimentos
+  (128 testes no total).
+- ADRs 018–020 sobre custo médio, cotações e imutabilidade/soft delete.
+
+### Changed
+
+- `src/app.ts` monta `InvestmentsRepository`/`InvestmentsService` e protege
+  `/api/v1/investments` e `/api/v1/investments/*` com `requireAuth`.
+- OpenAPI ganhou a tag `Investments` com todas as rotas de ativos, operações,
+  cotações, carteira e performance.
+- README, `AGENTS.md`, `docs/DECISIONS.md` e `docs/PLAN.md` atualizados para a
+  Fase 5.
+
+### Security
+
+- Ativos, operações, cotações e performance são sempre escopados pelo `user_id`
+  da sessão; acesso cruzado retorna `NOT_FOUND`.
+- Operações exigem conta do mesmo usuário e da mesma moeda do ativo.
+- Datas futuras ou anteriores à criação do ativo são rejeitadas, assim como
+  venda acima da posição, inclusive quando a operação é retroativa.
+- A moeda do ativo é imutável depois da primeira operação.
+
 ## [0.5.0] - 2026-11-05
 
 Quinta release: hábitos (Fase 4).

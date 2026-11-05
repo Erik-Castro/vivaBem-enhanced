@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento) e 4 (hábitos) concluídas, versão `0.5.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos) e 5 (investimentos) concluídas, versão `0.6.0`
 
 ---
 
@@ -44,7 +44,7 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`) e 4 (`0.5.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`) e 5 (`0.6.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -65,6 +65,7 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`) e 4 (`0.5.0`) estão
 | `src/modules/budgets/` | orçamentos, consumo por subárvore e limiares |
 | `src/modules/goals/` | metas, contribuições e progresso |
 | `src/modules/habits/` | hábitos, logs, streaks, calendário e gatilhos |
+| `src/modules/investments/` | ativos, operações, cotações, posições e performance |
 | `src/shared/utils/date.ts` | datas de negócio, soma de meses com clamp, intervalos e dia ISO |
 | `src/db/client.ts` | conexão SQLite + extensão vetorial + transações |
 | `src/db/migrate.ts` | runner forward-only com checksum |
@@ -72,9 +73,10 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`) e 4 (`0.5.0`) estão
 | `src/db/migrations/002_finance.sql` | contas, cartões, categorias, transações e parcelas |
 | `src/db/migrations/003_planning.sql` | recorrências, orçamentos, metas e contribuições |
 | `src/db/migrations/004_habits.sql` | hábitos, logs diários e gatilhos |
+| `src/db/migrations/005_investments.sql` | ativos, operações e cotações |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
 | `src/main.ts` | bootstrap: config → migrações → catch-up de recorrências → servidor |
-| `tests/` | unitários e integração com SQLite real (114 testes) |
+| `tests/` | unitários e integração com SQLite real (128 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
@@ -205,6 +207,34 @@ src/modules/<dominio>/
   subárvore remove em cascata os gatilhos relacionados.
 - `GET /habits/{id}/streak` e `GET /habits/{id}/calendar` aceitam `?date=` para
   avaliação determinística; o calendário cobre no máximo 366 dias.
+
+### 5.6 Investimentos (Fase 5)
+
+- `quantity` é `REAL > 0` (ativos fracionários); preços, taxas e valores
+  monetários são inteiros em minor units com a moeda do ativo.
+- Operações são `buy`, `sell`, `dividend` e `fee`; compras e vendas exigem
+  quantidade e preço, dividendos exigem quantidade e valor por unidade e taxas
+  avulsas exigem apenas `fees_minor > 0`.
+- O custo médio é ponderado: a compra soma preço + taxas à base de custo; a
+  venda remove a fração proporcional da base e realiza
+  `bruto - taxas - custo removido`; dividendos somam ao resultado e taxas
+  avulsas reduzem o realizado.
+- `totalPnlMinor = realizado + dividendos + não realizado`; o não realizado só
+  existe quando há cotação. `returnPercent = totalPnl / investido`, arredondado
+  a 2 casas.
+- A operação é validada contra a posição inteira recalculada, então venda a
+  descoberto é bloqueada mesmo em lançamentos retroativos. Operações não podem
+  ser futuras nem anteriores à criação do ativo.
+- A conta da operação precisa pertencer ao usuário e ter a mesma moeda do
+  ativo; a moeda do ativo é imutável depois da primeira operação.
+- A ordenação de operações no mesmo dia usa `operation_date`, `created_at` e
+  `rowid`; UUIDv7 do mesmo milissegundo não é monotônico e não serve como
+  desempate.
+- `GET /investments/portfolio` consolida posições e totais por moeda; uma
+  posição aberta sem cotação marca `valuationComplete = false`.
+- `investment_quotes` guarda o histórico; a cotação mais recente valoriza a
+  posição e a carteira. O ativo usa soft delete via `deleted_at` e o ticker é
+  único por usuário apenas entre ativos vivos (case-insensitive).
 
 ---
 
@@ -358,6 +388,7 @@ Regras:
 - Terceira release: `0.3.0` (2026-11-05), publicada ao concluir a Fase 2.
 - Quarta release: `0.4.0` (2026-11-05), publicada ao concluir a Fase 3.
 - Quinta release: `0.5.0` (2026-11-05), publicada ao concluir a Fase 4.
+- Sexta release: `0.6.0` (2026-11-05), publicada ao concluir a Fase 5.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -460,8 +491,8 @@ deno test --coverage
 | 2 | Finanças: contas/cartão, categorias, transações/transferências/parcelas, resumos | ✅ `0.3.0` |
 | 3 | Planejamento: recorrências, orçamentos + alertas, metas + contribuições | ✅ `0.4.0` |
 | 4 | Hábitos: CRUD, logs, streaks, calendário, triggers, stacking | ✅ `0.5.0` |
-| 5 | Investimentos: ativos, operações, posições, performance | ⏳ próximo |
-| 6 | Engajamento: catálogo + DSL de critérios, notificações | ⬜ |
+| 5 | Investimentos: ativos, operações, posições, performance | ✅ `0.6.0` |
+| 6 | Engajamento: catálogo + DSL de critérios, notificações | ⏳ próximo |
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ⬜ |
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ⬜ |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ⬜ |
@@ -497,6 +528,7 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/modules/budgets/` | Orçamentos, consumo por subárvore e limiares |
 | `src/modules/goals/` | Metas, contribuições e progresso |
 | `src/modules/habits/` | Hábitos, logs, streaks, calendário e gatilhos |
+| `src/modules/investments/` | Ativos, operações, cotações, posições e performance |
 | `src/db/migrations/` | Migrações SQL numeradas |
 | `bin/sqlite-vector/` | Binários de fallback da extensão vetorial |
 | `Dockerfile` | Imagem multi-stage não-root |

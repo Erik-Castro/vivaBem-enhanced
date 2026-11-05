@@ -80,6 +80,25 @@ Deno.test("migrate cria as tabelas de hábitos", async () => {
   }
 });
 
+Deno.test("migrate cria as tabelas de investimentos", async () => {
+  const testDb = await createTestDatabase();
+
+  try {
+    const rows = testDb.db
+      .prepare<[], { name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      )
+      .all();
+
+    const tables = new Set(rows.map((row) => row.name));
+    for (const table of ["investments", "investment_transactions", "investment_quotes"]) {
+      assertEquals(tables.has(table), true, `tabela ausente: ${table}`);
+    }
+  } finally {
+    testDb.cleanup();
+  }
+});
+
 Deno.test("migrate detecta checksum divergente", async () => {
   const testDb = await createTestDatabase({ migrate: false });
 
