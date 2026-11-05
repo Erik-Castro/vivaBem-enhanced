@@ -211,3 +211,63 @@ ou escrita é filtrada por `user_id`.
 escopo e chave natural eliminam vazamento entre usuários e ruído.
 **Consequência:** notificação de outro usuário responde `NOT_FOUND`, e a
 contagem de não lidas e o `read-all` nunca atravessam o escopo da sessão.
+
+## ADR-024 — Claim do outbox por `UPDATE ... RETURNING`
+
+**Decisão:** o worker reivindica um evento com um único
+`UPDATE event_outbox ... RETURNING *`, incrementando `attempts` no próprio
+claim, em vez de abrir uma transação explícita com `BEGIN IMMEDIATE`.
+**Motivo:** o `UPDATE` é atômico no SQLite e evita uma transação extra por
+evento; incrementar no claim também impede que duas instâncias processem o
+mesmo evento após um lease expirado.
+**Consequência:** o limite de tentativas é `AI_MAX_RETRIES + 1`; eventos
+travados são recuperados por `locked_at` antes de cada ciclo e vão direto para
+dead-letter quando as tentativas já acabaram.
+
+## ADR-025 — Provider abstrato e executor de tools síncrono
+
+**Decisão:** o processor conhece apenas a interface `AiProvider`
+(OpenAI-compatible ou Ollama). As tools podem devolver `AiToolResult` de forma
+síncrona ou `Promise`, já que a maioria só grava notificação/insight.
+**Motivo:** um provider fake determinístico permite testar o pipeline sem rede,
+e tornar toda tool `async` artificialmente só adicionaria ruído.
+**Consequência:** o executor continua sendo assíncrono por causa do provider,
+mas uma tool síncrona não precisa de `await`; o adaptador escolhido é definido
+por `AI_PROVIDER`.
+
+## ADR-026 — LLM sem SQL, com whitelist de tools e redação de PII
+
+**Decisão:** o modelo só pode sugerir chamadas para ferramentas registradas; o
+executor valida schema, confiança, cooldown, duplicidade e risco antes de
+executar, e audita tudo em `ai_action_logs`. Ferramentas de risco alto exigem
+confiança ≥ 0.9. Todo contexto passa por redação de PII antes de sair para o
+provider.
+**Motivo:** o LLM não é confiável para executar SQL ou decidir sozinho sobre
+dados financeiros; a whitelist limita o dano de uma resposta malformada ou
+maliciosa.
+**Consequência:** nomes desconhecidos são apenas auditados e ignorados; nenhum
+texto do modelo entra em uma query.
+
+## ADR-027 — Embeddings assíncronos com fallback textual
+
+**Decisão:** a indexação é enfileirada como `embedding.requested` e processada
+pelo worker; `vector_init` acontece de forma preguiçosa na primeira conexão com
+IA habilitada. A busca usa similaridade vetorial escopada por usuário e cai
+para `LIKE` em título/mensagem quando não há embedding.
+**Motivo:** gerar embeddings no caminho HTTP aumentaria a latência e falharia
+quando o provider estivesse indisponível; o fallback mantém a busca útil
+durante a indexação inicial.
+**Consequência:** um insight recém-criado pode aparecer pela busca textual
+antes de estar vetorizado; trocar o modelo exige reindexação.
+
+## ADR-028 — Correlação determinística disparada por volume
+
+**Decisão:** padrões cross-domain (`habit_spending_link` e
+`weekend_spending_peak`) são calculados em SQL a partir de janelas de 30 dias.
+O scheduler só enfileira `correlation.check` quando o número de eventos
+concluídos desde a última execução atinge `AI_CORRELATION_THRESHOLD`, e marca a
+execução mesmo quando não encontra padrão.
+**Motivo:** avaliar todos os dados a cada transação seria caro e geraria
+ruído; o LLM deve apenas resumir números já calculados.
+**Consequência:** a correlação é eventual e por volume, não em tempo real; um
+usuário com pouco movimento pode demorar a receber o primeiro insight.

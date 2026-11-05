@@ -2,6 +2,8 @@ import type { AppDatabase } from "../../db/client.ts";
 import { AppError } from "../../http/errors.ts";
 import { addMonthsClamped } from "../../shared/utils/date.ts";
 import { uuidv7 } from "../../shared/utils/uuid.ts";
+import type { EventPublisher } from "../../events/event-publisher.ts";
+import type { EventType } from "../../events/events.types.ts";
 import type { Account, AccountsRepository } from "../accounts/accounts.repository.ts";
 import type { CategoriesRepository, Category } from "../categories/categories.repository.ts";
 import type {
@@ -75,6 +77,7 @@ export interface TransactionsServiceDependencies {
   readonly repository: TransactionsRepository;
   readonly accounts: AccountsRepository;
   readonly categories: CategoriesRepository;
+  readonly events?: EventPublisher;
 }
 
 export class TransactionsService {
@@ -82,12 +85,14 @@ export class TransactionsService {
   readonly #repository: TransactionsRepository;
   readonly #accounts: AccountsRepository;
   readonly #categories: CategoriesRepository;
+  readonly #events: EventPublisher | null;
 
   constructor(dependencies: TransactionsServiceDependencies) {
     this.#db = dependencies.db;
     this.#repository = dependencies.repository;
     this.#accounts = dependencies.accounts;
     this.#categories = dependencies.categories;
+    this.#events = dependencies.events ?? null;
   }
 
   list(
@@ -165,6 +170,16 @@ export class TransactionsService {
         now,
       });
       createdIds.push(transactionId);
+      this.#publish("finance.transaction.created", userId, transactionId, {
+        transactionId,
+        accountId: account.id,
+        categoryId,
+        type: input.type,
+        amountMinor: input.amountMinor,
+        currencyCode,
+        transactionDate: input.transactionDate,
+        description,
+      });
     } else {
       const installmentGroupId = uuidv7();
       const amounts = splitInstallments(input.amountMinor, totalInstallments);
@@ -195,6 +210,18 @@ export class TransactionsService {
             installmentGroupId,
           });
           createdIds.push(transactionId);
+          this.#publish("finance.transaction.created", userId, transactionId, {
+            transactionId,
+            accountId: account.id,
+            categoryId,
+            type: input.type,
+            amountMinor: amount,
+            currencyCode,
+            transactionDate: addMonthsClamped(input.transactionDate, index),
+            description,
+            installmentNumber: index + 1,
+            totalInstallments,
+          });
         }
       });
     }
@@ -263,6 +290,24 @@ export class TransactionsService {
         importHash: null,
         now,
       });
+
+      this.#events?.publish({
+        type: "finance.transfer.created",
+        aggregateType: "transfer",
+        aggregateId: transferGroupId,
+        userId,
+        payload: {
+          transferGroupId,
+          fromTransactionId: fromId,
+          toTransactionId: toId,
+          fromAccountId: from.id,
+          toAccountId: to.id,
+          amountMinor: input.amountMinor,
+          currencyCode: from.currencyCode,
+          transactionDate: input.transactionDate,
+          description,
+        },
+      });
     });
 
     return {
@@ -293,6 +338,16 @@ export class TransactionsService {
         transactionDate: input.transactionDate ?? current.transactionDate,
         isCleared: input.isCleared ?? current.isCleared,
         now,
+      });
+
+      this.#publish("finance.transaction.updated", userId, transactionId, {
+        transactionId,
+        transferGroupId: current.transferGroupId,
+        description: input.description === undefined
+          ? current.description
+          : normalizeDescription(input.description),
+        transactionDate: input.transactionDate ?? current.transactionDate,
+        isCleared: input.isCleared ?? current.isCleared,
       });
 
       return this.get(userId, transactionId);
@@ -331,6 +386,17 @@ export class TransactionsService {
       now,
     });
 
+    this.#publish("finance.transaction.updated", userId, transactionId, {
+      transactionId,
+      categoryId,
+      amountMinor: input.amountMinor ?? current.amountMinor,
+      description: input.description === undefined
+        ? current.description
+        : normalizeDescription(input.description),
+      transactionDate: input.transactionDate ?? current.transactionDate,
+      isCleared: input.isCleared ?? current.isCleared,
+    });
+
     return this.get(userId, transactionId);
   }
 
@@ -340,6 +406,10 @@ export class TransactionsService {
 
     if (current.transferGroupId !== null) {
       this.#repository.softDeleteTransferGroup(userId, current.transferGroupId, now);
+      this.#publish("finance.transaction.deleted", userId, transactionId, {
+        transactionId,
+        transferGroupId: current.transferGroupId,
+      });
       return;
     }
 
@@ -349,10 +419,15 @@ export class TransactionsService {
         current.installment.installmentGroupId,
         now,
       );
+      this.#publish("finance.transaction.deleted", userId, transactionId, {
+        transactionId,
+        installmentGroupId: current.installment.installmentGroupId,
+      });
       return;
     }
 
     this.#repository.softDelete(transactionId, now);
+    this.#publish("finance.transaction.deleted", userId, transactionId, { transactionId });
   }
 
   clear(userId: string, transactionId: string): Transaction {
@@ -380,12 +455,32 @@ export class TransactionsService {
       });
     }
 
+    this.#publish("finance.transaction.cleared", userId, transactionId, {
+      transactionId,
+      transferGroupId: current.transferGroupId,
+    });
+
     return this.get(userId, transactionId);
   }
 
   summary(userId: string, filters: TransactionFilters): TransactionSummary {
     const rows = this.#repository.summary(userId, filters);
     return aggregateSummary(rows, filters);
+  }
+
+  #publish(
+    type: EventType,
+    userId: string,
+    transactionId: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.#events?.publish({
+      type,
+      aggregateType: "transaction",
+      aggregateId: transactionId,
+      userId,
+      payload,
+    });
   }
 
   #requireActiveAccount(userId: string, accountId: string): Account {

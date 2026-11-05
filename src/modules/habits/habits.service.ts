@@ -1,5 +1,6 @@
 import { AppError } from "../../http/errors.ts";
 import type { AppDatabase } from "../../db/client.ts";
+import type { EventPublisher } from "../../events/event-publisher.ts";
 import { daysBetween, monthBounds, todayUtc } from "../../shared/utils/date.ts";
 import { uuidv7 } from "../../shared/utils/uuid.ts";
 import {
@@ -93,15 +94,18 @@ export interface UpdateTriggerInput {
 export interface HabitsServiceDependencies {
   readonly db: AppDatabase;
   readonly repository: HabitsRepository;
+  readonly events?: EventPublisher;
 }
 
 export class HabitsService {
   readonly #db: AppDatabase;
   readonly #repository: HabitsRepository;
+  readonly #events: EventPublisher | null;
 
   constructor(dependencies: HabitsServiceDependencies) {
     this.#db = dependencies.db;
     this.#repository = dependencies.repository;
+    this.#events = dependencies.events ?? null;
   }
 
   list(userId: string, options: ListHabitsOptions = {}): Habit[] {
@@ -136,6 +140,21 @@ export class HabitsService {
       orderIndex: input.orderIndex ?? this.#repository.nextOrderIndex(userId),
       parentHabitId,
       now,
+    });
+
+    this.#events?.publish({
+      type: "habit.created",
+      aggregateType: "habit",
+      aggregateId: habitId,
+      userId,
+      payload: {
+        habitId,
+        name: input.name.trim(),
+        habitType: input.habitType,
+        frequencyType,
+        daysOfWeek,
+        dailyTarget: input.dailyTarget ?? 1,
+      },
     });
 
     return this.get(userId, habitId);
@@ -278,6 +297,22 @@ export class HabitsService {
       throw new AppError("INTERNAL_ERROR", "Falha ao registrar o hábito");
     }
 
+    this.#events?.publish({
+      type: created ? "habit.log.created" : "habit.log.updated",
+      aggregateType: "habit_log",
+      aggregateId: log.id,
+      userId,
+      payload: {
+        habitId,
+        logId: log.id,
+        logDate: log.logDate,
+        value: log.value,
+        habitType: habit.habitType,
+        dailyTarget: habit.dailyTarget,
+        replacementUsed: log.replacementUsed,
+      },
+    });
+
     return { log, created };
   }
 
@@ -310,6 +345,14 @@ export class HabitsService {
     }
 
     this.#repository.softDeleteLog(logId, new Date().toISOString());
+
+    this.#events?.publish({
+      type: "habit.log.deleted",
+      aggregateType: "habit_log",
+      aggregateId: logId,
+      userId,
+      payload: { habitId, logId, logDate: log.logDate },
+    });
   }
 
   streak(userId: string, habitId: string, today: string = todayUtc()): HabitStreak {

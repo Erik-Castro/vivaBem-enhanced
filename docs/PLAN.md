@@ -501,13 +501,15 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 | Achievements | `GET /achievements`, `GET /achievements/me`, `GET /achievements/me/progress` |
 | Notifications | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/:id/read`, `POST /notifications/read-all` |
 | Family | `POST /family/invite`, `POST /family/accept`, `GET /family/link`, `DELETE /family/link` |
-| Insights | `GET /insights`, `PATCH /insights/:id/read`, `POST /insights/:id/feedback`, `GET /insights/search?q=` (semântica) |
+| Insights | `GET /insights`, `GET /insights/unread-count`, `GET /insights/search?q=`, `PATCH /insights/:id/read`, `POST /insights/read-all`, `POST /insights/:id/feedback` |
 | Export | `GET /export?format=csv\|json` |
 | Import | `POST /import/preview`, `POST /import/commit` (CSV/OFX; Fase 8) |
 
 ---
 
 ## 7. IA / EIE
+
+> Implementado na `0.8.0` (Fase 7).
 
 ### 7.1 Fluxo
 
@@ -529,10 +531,14 @@ Worker (claim/lease)
 ### 7.2 Outbox e worker
 
 - `event_outbox` gravado na mesma transação do domínio.
-- Claim atômico com `BEGIN IMMEDIATE` + `UPDATE ... WHERE status='pending' AND available_at<=?`.
-- Lease com `locked_at`/`worker_id`; recuperação de eventos travados.
-- Backoff exponencial; `attempts`; dead-letter após `AI_MAX_RETRIES`.
-- Idempotência por `event.id`; tools também deduplicam.
+- Claim atômico com um único `UPDATE ... RETURNING`, que também incrementa
+  `attempts`; o evento só é elegível quando `available_at <= now`.
+- Lease com `locked_at`/`worker_id`; recuperação de eventos travados antes de
+  cada ciclo.
+- Backoff exponencial (5s, 10s, 20s… até 5 min); dead-letter após
+  `AI_MAX_RETRIES`.
+- Idempotência por `event.id`; tools também deduplicam argumentos e respeitam
+  cooldown.
 - Worker single-instance no mesmo processo; `AI_ENABLED=false` desliga tudo sem quebrar a API.
 
 ### 7.3 Provider
@@ -541,8 +547,9 @@ Worker (claim/lease)
   - `POST {AI_API_BASE_URL}/chat/completions`
   - `POST {AI_API_BASE_URL}/embeddings`
 - Config: `AI_API_BASE_URL`, `AI_API_KEY`, `AI_API_MODEL_CHAT_NAME`, `AI_API_MODEL_EMBEDDINGS_NAME`, `AI_EMBEDDING_DIMENSIONS`.
-- Adapter Ollama opcional (`AI_OLLAMA_URL`, `AI_MODEL`).
-- Timeout com `AbortController`; retry com jitter.
+- Adapter Ollama opcional (`AI_OLLAMA_URL`, `AI_MODEL`), escolhido por `AI_PROVIDER`.
+- Timeout com `AbortController`; retry é responsabilidade do worker, que aplica
+  backoff exponencial.
 - Parser robusto: remove ` thinking`, markdown, prosa; extrai o primeiro objeto JSON; valida com Zod.
 - `response_format: { type: "json_object" }` quando suportado.
 
@@ -560,8 +567,8 @@ Worker (claim/lease)
   ```
 - Tool registry tipado: `name`, `description`, `category`, `risk`, `parameters` (Zod), `executor`.
 - Executor valida parâmetros, autorização, cooldown, duplicidade e confiança mínima; audita em `ai_action_logs`.
-- Tools iniciais: segurança (`block_ip`, `notify_admin`, `invalidate_session`), finanças (`notify_user`, `flag_budget_attention`, `suggest_category`, `create_financial_insight`), hábitos (`create_habit_suggestion`, `recommend_goal`, `create_motivation`), investimentos (`create_market_note`, `recommend_review`), família/correlação.
-- Nenhuma tool executa SQL arbitrário; tools só escrevem insights/notificações/flags.
+- Tools iniciais: segurança (`block_ip`, `notify_admin`, `invalidate_session`), finanças (`notify_user`, `flag_budget_attention`, `suggest_category`, `create_financial_insight`), hábitos (`create_habit_suggestion`, `recommend_goal`, `create_motivation`), investimentos (`create_market_note`, `recommend_review`) e correlação (`create_correlation_insight`, `notify_correlation`).
+- Nenhuma tool executa SQL arbitrário; tools só escrevem insights/notificações/flags. O executor aceita retorno síncrono ou `Promise`.
 
 ### 7.5 Embeddings e RAG
 
@@ -569,7 +576,8 @@ Worker (claim/lease)
 - `SELECT vector_init('embedding_items', 'embedding', 'dimension=<N>,type=FLOAT32,distance=cosine,normalized=1')` em cada conexão.
 - Embedar transações (descrição), hábitos (nome/notas), insights e metas.
 - Geração assíncrona via evento (`embedding.requested`) para não bloquear a API.
-- Busca: `vector_full_scan`/`vector_quantize_scan` com filtro por `user_id` em streaming.
+- Busca: `vector_full_scan` com filtro por `user_id`; fallback textual quando
+  ainda não há embedding.
 - Usos: busca semântica em insights/transações, detecção de assinaturas duplicadas, contexto para o LLM.
 - Modelo/dimensões versionados em `embedding_items`; troca de modelo exige reindexação.
 
@@ -785,5 +793,5 @@ deno task release -- patch|minor|major
 
 ## 16. Próximo passo
 
-Iniciar a **Fase 7** (eventos + IA): outbox transacional, worker com claim/lease,
-provider OpenAI-compatible, prompts, tools/executor, insights e embeddings.
+Iniciar a **Fase 8** (dados e colaboração): import CSV/OFX com dedupe, export
+completo e family links escopados.

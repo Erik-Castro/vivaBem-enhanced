@@ -1,5 +1,6 @@
 import type { AppDatabase } from "../../db/client.ts";
 import { AppError } from "../../http/errors.ts";
+import type { EventPublisher } from "../../events/event-publisher.ts";
 import {
   addDays,
   addMonthsWithDay,
@@ -88,6 +89,7 @@ export interface RecurringServiceDependencies {
   readonly transactions: TransactionsRepository;
   readonly accounts: AccountsRepository;
   readonly categories: CategoriesRepository;
+  readonly events?: EventPublisher;
 }
 
 export class RecurringService {
@@ -96,6 +98,7 @@ export class RecurringService {
   readonly #transactions: TransactionsRepository;
   readonly #accounts: AccountsRepository;
   readonly #categories: CategoriesRepository;
+  readonly #events: EventPublisher | null;
 
   constructor(dependencies: RecurringServiceDependencies) {
     this.#db = dependencies.db;
@@ -103,6 +106,7 @@ export class RecurringService {
     this.#transactions = dependencies.transactions;
     this.#accounts = dependencies.accounts;
     this.#categories = dependencies.categories;
+    this.#events = dependencies.events ?? null;
   }
 
   list(userId: string, includeInactive = false): RecurringTransaction[] {
@@ -376,6 +380,24 @@ export class RecurringService {
       occurrenceDate,
       transactionId,
       now,
+    });
+
+    this.#events?.publish({
+      type: "recurring.occurrence.materialized",
+      aggregateType: "recurring_transaction",
+      aggregateId: recurring.id,
+      userId,
+      payload: {
+        recurringId: recurring.id,
+        transactionId,
+        occurrenceDate,
+        type: recurring.type,
+        amountMinor: recurring.amountMinor,
+        currencyCode: recurring.currencyCode,
+        description: recurring.description,
+        categoryId: recurring.categoryId,
+        accountId: recurring.accountId,
+      },
     });
 
     const transaction = this.#transactions.findById(userId, transactionId);

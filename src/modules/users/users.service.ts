@@ -13,6 +13,7 @@ export interface UserView {
     readonly timezone: string;
     readonly baseCurrency: string;
     readonly locale: string;
+    readonly aiEnabled: boolean;
   };
 }
 
@@ -64,6 +65,7 @@ export class UsersService {
       readonly timezone?: string;
       readonly baseCurrency?: string;
       readonly locale?: string;
+      readonly aiEnabled?: boolean;
     },
   ): MeResult {
     const updated = this.repository.updatePreferences(userId, patch, new Date().toISOString());
@@ -134,6 +136,7 @@ export function toUserView(
       timezone: preferences.timezone,
       baseCurrency: preferences.baseCurrency,
       locale: preferences.locale,
+      aiEnabled: preferences.aiEnabled,
     },
   };
 }

@@ -1,5 +1,6 @@
 import type { AppConfig } from "../../config.ts";
 import type { AppDatabase } from "../../db/client.ts";
+import type { EventPublisher } from "../../events/event-publisher.ts";
 import { hashPassword, verifyPassword } from "../../shared/helpers/argon2id.ts";
 import { signAccessToken } from "../../shared/crypto/jwt.ts";
 import { generateOpaqueToken, sha256Hex } from "../../shared/crypto/tokens.ts";
@@ -52,6 +53,7 @@ export interface AuthServiceDependencies {
   readonly logger: Logger;
   readonly repository: AuthRepository;
   readonly rateLimiter: SlidingWindowRateLimiter;
+  readonly events?: EventPublisher;
 }
 
 /**
@@ -65,6 +67,7 @@ export class AuthService {
   readonly #logger: Logger;
   readonly #repository: AuthRepository;
   readonly #rateLimiter: SlidingWindowRateLimiter;
+  readonly #events: EventPublisher | null;
   readonly #accessTtlSeconds: number;
   readonly #refreshTtlSeconds: number;
   #dummyHash?: Promise<string>;
@@ -75,6 +78,7 @@ export class AuthService {
     this.#logger = dependencies.logger;
     this.#repository = dependencies.repository;
     this.#rateLimiter = dependencies.rateLimiter;
+    this.#events = dependencies.events ?? null;
     this.#accessTtlSeconds = parseDurationSeconds(this.#config.accessTokenTtl) ?? 15 * 60;
     this.#refreshTtlSeconds = parseDurationSeconds(this.#config.refreshTokenTtl) ??
       30 * 24 * 60 * 60;
@@ -132,6 +136,13 @@ export class AuthService {
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
         now: nowIso,
+      });
+
+      this.#publishSecurity("security.login_success", userId, {
+        email,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        registered: true,
       });
     });
 
@@ -192,6 +203,13 @@ export class AuthService {
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
         now: nowIso,
+      });
+
+      this.#publishSecurity("security.login_success", credentials.userId, {
+        email,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        registered: false,
       });
     });
 
@@ -366,6 +384,36 @@ export class AuthService {
       ipAddress: input.context.ipAddress,
       userAgent: input.context.userAgent,
       now: new Date().toISOString(),
+    });
+
+    // Só falhas e reuso viram evento de IA. `refresh` e `logout` são ruído
+    // operacional e não devem consumir tokens do provider.
+    if (input.type === "login_failed" && input.userId) {
+      this.#publishSecurity("security.login_failed", input.userId, {
+        email: input.email,
+        ipAddress: input.context.ipAddress,
+        userAgent: input.context.userAgent,
+      });
+    } else if (input.type === "reuse_detected" && input.userId) {
+      this.#publishSecurity("security.session_reuse", input.userId, {
+        email: input.email,
+        ipAddress: input.context.ipAddress,
+        userAgent: input.context.userAgent,
+      });
+    }
+  }
+
+  #publishSecurity(
+    type: "security.login_failed" | "security.login_success" | "security.session_reuse",
+    userId: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.#events?.publish({
+      type,
+      aggregateType: "user",
+      aggregateId: userId,
+      userId,
+      payload,
     });
   }
 

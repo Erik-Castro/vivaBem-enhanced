@@ -69,9 +69,12 @@ Deno.test("IA habilitada com configuração completa", () => {
   const config = loadConfig({
     AI_ENABLED: "true",
     AI_API_BASE_URL: "http://localhost:11434/v1",
+    AI_API_MODEL_CHAT_NAME: "gpt-4o-mini",
+    AI_API_MODEL_EMBEDDINGS_NAME: "text-embedding-3-small",
     AI_EMBEDDING_DIMENSIONS: "768",
   });
 
   assertEquals(config.ai.enabled, true);
+  assertEquals(config.ai.provider, "openai");
   assertEquals(config.ai.embeddingDimensions, 768);
 });

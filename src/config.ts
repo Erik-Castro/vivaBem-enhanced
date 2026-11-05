@@ -11,13 +11,18 @@ export interface Argon2Config {
   readonly parallelism: number;
 }
 
+export const AI_PROVIDERS = ["openai", "ollama"] as const;
+export type AiProviderName = (typeof AI_PROVIDERS)[number];
+
 export interface AiConfig {
   readonly enabled: boolean;
+  readonly provider: AiProviderName;
   readonly apiBaseUrl?: string;
   readonly apiKey?: string;
   readonly chatModel?: string;
   readonly embeddingsModel?: string;
   readonly embeddingDimensions?: number;
+  readonly requestTimeoutMs: number;
   readonly workerIntervalMs: number;
   readonly maxRetries: number;
   readonly confidenceThreshold: number;
@@ -107,11 +112,13 @@ const rawConfigSchema = z.object({
   RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(10_000).default(5),
   RATE_LIMIT_WINDOW: duration.default("1m"),
   AI_ENABLED: envBoolean(false),
+  AI_PROVIDER: z.enum(AI_PROVIDERS).default("openai"),
   AI_API_BASE_URL: optionalUrl,
   AI_API_KEY: optionalString,
   AI_API_MODEL_CHAT_NAME: optionalString,
   AI_API_MODEL_EMBEDDINGS_NAME: optionalString,
   AI_EMBEDDING_DIMENSIONS: optionalPositiveInt,
+  AI_REQUEST_TIMEOUT: z.coerce.number().int().min(1000).max(600_000).default(60_000),
   AI_WORKER_INTERVAL: z.coerce.number().int().min(100).default(5000),
   AI_MAX_RETRIES: z.coerce.number().int().min(0).max(20).default(3),
   AI_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.7),
@@ -155,9 +162,27 @@ export function loadConfig(
     ]);
   }
 
-  if (raw.AI_ENABLED && !raw.AI_API_BASE_URL) {
+  if (raw.AI_ENABLED && raw.AI_PROVIDER === "openai" && !raw.AI_API_BASE_URL) {
     throw new ConfigError("Configuração de ambiente inválida", [
-      "AI_API_BASE_URL: obrigatório quando AI_ENABLED=true",
+      "AI_API_BASE_URL: obrigatório quando AI_ENABLED=true e AI_PROVIDER=openai",
+    ]);
+  }
+
+  if (raw.AI_ENABLED && raw.AI_PROVIDER === "openai" && !raw.AI_API_MODEL_CHAT_NAME) {
+    throw new ConfigError("Configuração de ambiente inválida", [
+      "AI_API_MODEL_CHAT_NAME: obrigatório quando AI_ENABLED=true e AI_PROVIDER=openai",
+    ]);
+  }
+
+  if (raw.AI_ENABLED && !raw.AI_API_MODEL_EMBEDDINGS_NAME) {
+    throw new ConfigError("Configuração de ambiente inválida", [
+      "AI_API_MODEL_EMBEDDINGS_NAME: obrigatório quando AI_ENABLED=true",
+    ]);
+  }
+
+  if (raw.AI_ENABLED && raw.AI_PROVIDER === "ollama" && !raw.AI_MODEL) {
+    throw new ConfigError("Configuração de ambiente inválida", [
+      "AI_MODEL: obrigatório quando AI_ENABLED=true e AI_PROVIDER=ollama",
     ]);
   }
 
@@ -194,11 +219,13 @@ export function loadConfig(
     },
     ai: {
       enabled: raw.AI_ENABLED,
+      provider: raw.AI_PROVIDER,
       apiBaseUrl: raw.AI_API_BASE_URL,
       apiKey: raw.AI_API_KEY,
       chatModel: raw.AI_API_MODEL_CHAT_NAME,
       embeddingsModel: raw.AI_API_MODEL_EMBEDDINGS_NAME,
       embeddingDimensions: raw.AI_EMBEDDING_DIMENSIONS,
+      requestTimeoutMs: raw.AI_REQUEST_TIMEOUT,
       workerIntervalMs: raw.AI_WORKER_INTERVAL,
       maxRetries: raw.AI_MAX_RETRIES,
       confidenceThreshold: raw.AI_CONFIDENCE_THRESHOLD,

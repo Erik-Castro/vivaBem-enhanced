@@ -143,7 +143,8 @@ Todas as variáveis estão em [`.env.example`](.env.example). Destaques:
 | `DATABASE_PATH`         | `./data/app.db`         | Use `/app/data/app.db` no Docker             |
 | `APP_ORIGIN`            | `http://localhost:3000` | CORS/CSRF                                    |
 | `JWT_SECRET`            | —                       | **Obrigatório em produção** (32+ caracteres) |
-| `AI_ENABLED`            | `false`                 | IA é opt-in                                  |
+| `AI_ENABLED`            | `false`                 | IA é opt-in por usuário                      |
+| `AI_PROVIDER`           | `openai`                | `openai` (compatível) ou `ollama`            |
 | `VECTOR_EXTENSION_PATH` | —                       | Sobrescreve o binário do `sqlite-vector`     |
 
 Nenhum segredo tem valor padrão em produção. Em dev, um segredo efêmero é gerado no boot (com aviso
@@ -173,8 +174,8 @@ src/
   http/            # erros, OpenAPI, middlewares
   db/              # conexão, migrações, repositórios
   modules/         # domínios (auth, transactions, habits, ...)
-  events/          # outbox + worker (Fase 7)
-  ai/              # providers, prompts, tools (Fase 7)
+  events/          # outbox + worker
+  ai/              # providers, prompts, tools, executor, embeddings
   shared/          # logger, crypto, utils
 tests/             # unit, integration, e2e
 bin/sqlite-vector/ # fallback do binário da extensão vetorial
@@ -189,6 +190,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 
 ## Status
 
-Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos) e
-6 (engajamento) concluídas — versão atual `0.7.0`. Próxima: Fase 7 (eventos + IA). Veja o roadmap em
-[`AGENTS.md`](AGENTS.md#16-roadmap).
+Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
+6 (engajamento) e 7 (eventos + IA) concluídas — versão atual `0.8.0`. Próxima: Fase 8 (dados e
+colaboração). Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).

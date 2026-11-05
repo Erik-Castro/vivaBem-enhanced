@@ -1,5 +1,6 @@
 import type { AppDatabase } from "../../db/client.ts";
 import { AppError } from "../../http/errors.ts";
+import type { EventPublisher } from "../../events/event-publisher.ts";
 import { uuidv7 } from "../../shared/utils/uuid.ts";
 import type { Account, AccountsRepository } from "../accounts/accounts.repository.ts";
 import type { UserPreferencesReader } from "../accounts/accounts.service.ts";
@@ -47,6 +48,7 @@ export interface GoalsServiceDependencies {
   readonly repository: GoalsRepository;
   readonly accounts: AccountsRepository;
   readonly preferences: UserPreferencesReader;
+  readonly events?: EventPublisher;
 }
 
 export class GoalsService {
@@ -54,12 +56,14 @@ export class GoalsService {
   readonly #repository: GoalsRepository;
   readonly #accounts: AccountsRepository;
   readonly #preferences: UserPreferencesReader;
+  readonly #events: EventPublisher | null;
 
   constructor(dependencies: GoalsServiceDependencies) {
     this.#db = dependencies.db;
     this.#repository = dependencies.repository;
     this.#accounts = dependencies.accounts;
     this.#preferences = dependencies.preferences;
+    this.#events = dependencies.events ?? null;
   }
 
   list(userId: string, status?: GoalStatus): Goal[] {
@@ -169,10 +173,11 @@ export class GoalsService {
     }
 
     const now = new Date().toISOString();
+    const contributionId = uuidv7();
 
     this.#db.transaction(() => {
       this.#repository.insertContribution({
-        id: uuidv7(),
+        id: contributionId,
         goalId,
         accountId,
         transactionId: null,
@@ -188,6 +193,22 @@ export class GoalsService {
       ) {
         this.#repository.updateStatus(goalId, "completed", now);
       }
+
+      this.#events?.publish({
+        type: "finance.goal.contribution.created",
+        aggregateType: "goal",
+        aggregateId: goalId,
+        userId,
+        payload: {
+          goalId,
+          goalName: goal.name,
+          contributionId,
+          amountMinor: input.amountMinor,
+          currencyCode: goal.currencyCode,
+          contributionDate: input.contributionDate,
+          targetAmountMinor: goal.targetAmountMinor,
+        },
+      });
     });
 
     return this.progress(userId, goalId);

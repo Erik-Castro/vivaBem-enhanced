@@ -1,4 +1,5 @@
 import { AppError } from "../../http/errors.ts";
+import type { EventPublisher } from "../../events/event-publisher.ts";
 import { monthBounds, todayUtc, yearBounds } from "../../shared/utils/date.ts";
 import { uuidv7 } from "../../shared/utils/uuid.ts";
 import type { UserPreferencesReader } from "../accounts/accounts.service.ts";
@@ -54,17 +55,20 @@ export interface BudgetsServiceDependencies {
   readonly repository: BudgetsRepository;
   readonly categories: CategoriesRepository;
   readonly preferences: UserPreferencesReader;
+  readonly events?: EventPublisher;
 }
 
 export class BudgetsService {
   readonly #repository: BudgetsRepository;
   readonly #categories: CategoriesRepository;
   readonly #preferences: UserPreferencesReader;
+  readonly #events: EventPublisher | null;
 
   constructor(dependencies: BudgetsServiceDependencies) {
     this.#repository = dependencies.repository;
     this.#categories = dependencies.categories;
     this.#preferences = dependencies.preferences;
+    this.#events = dependencies.events ?? null;
   }
 
   list(userId: string, includeInactive = false): Budget[] {
@@ -108,6 +112,18 @@ export class BudgetsService {
       now,
     });
 
+    this.#publish("finance.budget.created", userId, budgetId, {
+      budgetId,
+      name: input.name.trim(),
+      categoryId,
+      limitMinor: input.limitMinor,
+      currencyCode,
+      periodType: input.periodType,
+      startDate: input.startDate,
+      endDate,
+      alertThreshold: input.alertThreshold ?? 80,
+    });
+
     return this.get(userId, budgetId);
   }
 
@@ -139,6 +155,19 @@ export class BudgetsService {
       alertThreshold,
       isActive: input.isActive ?? current.isActive,
       now: new Date().toISOString(),
+    });
+
+    this.#publish("finance.budget.updated", userId, budgetId, {
+      budgetId,
+      name: input.name === undefined ? current.name : input.name.trim(),
+      categoryId,
+      limitMinor: input.limitMinor ?? current.limitMinor,
+      currencyCode: input.currencyCode ?? current.currencyCode,
+      periodType,
+      startDate,
+      endDate,
+      alertThreshold,
+      isActive: input.isActive ?? current.isActive,
     });
 
     return this.get(userId, budgetId);
@@ -177,6 +206,21 @@ export class BudgetsService {
       ),
       isPeriodActive,
     };
+  }
+
+  #publish(
+    type: "finance.budget.created" | "finance.budget.updated",
+    userId: string,
+    budgetId: string,
+    payload: Record<string, unknown>,
+  ): void {
+    this.#events?.publish({
+      type,
+      aggregateType: "budget",
+      aggregateId: budgetId,
+      userId,
+      payload,
+    });
   }
 
   #requireExpenseCategory(userId: string, categoryId: string): Category {

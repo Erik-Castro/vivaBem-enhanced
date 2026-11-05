@@ -11,6 +11,73 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.8.0] - 2026-11-05
+
+Oitava release: eventos + IA (Fase 7).
+
+### Added
+
+- Migração `007_ai.sql` com `event_outbox`, `ai_action_logs`, `ai_insights`,
+  `ai_feedback`, `embedding_items`, `ip_blocklist` e
+  `ai_correlation_state`, além do opt-in `user_preferences.ai_enabled`.
+- `event_outbox` transacional: os eventos nascem na mesma transação da regra de
+  negócio e só são gravados quando `AI_ENABLED=true` e o usuário autorizou a IA.
+- Worker do outbox com claim atômico por `UPDATE ... RETURNING`, lease,
+  recuperação de eventos travados, backoff exponencial, limite de tentativas e
+  dead-letter.
+- Providers OpenAI-compatible e Ollama via `fetch`, com timeout por
+  `AbortController` e `AI_PROVIDER` para escolher o adaptador.
+- Context builders de finanças, hábitos, investimentos, segurança, recorrência
+  e correlação; métricas continuam sendo calculadas em SQL.
+- Parser robusto de resposta do LLM (blocos `think`, cercas markdown, prosa,
+  formatos alternativos de tool call) e validação Zod.
+- Redação de PII (e-mail, CPF, telefone, cartão e chaves sensíveis) antes de
+  enviar contexto ao provider.
+- Tool registry e executor com validação de schema, confiança mínima,
+  exigência extra para ferramentas de risco alto, cooldown, deduplicação por
+  argumentos e auditoria em `ai_action_logs`.
+- Ferramentas de segurança (`block_ip`, `notify_admin`, `invalidate_session`),
+  finanças, hábitos, investimentos e correlação.
+- Módulo de insights com `GET /api/v1/insights`,
+  `GET /api/v1/insights/unread-count`, `GET /api/v1/insights/search`,
+  `PATCH /api/v1/insights/{id}/read`, `POST /api/v1/insights/read-all` e
+  `POST /api/v1/insights/{id}/feedback`.
+- Embeddings assíncronos via `embedding.requested`, `vector_init` preguiçoso,
+  normalização L2 e busca semântica escopada por usuário, com fallback textual
+  quando a indexação ainda não aconteceu.
+- Correlação cross-domain calculada em SQL (`habit_spending_link` e
+  `weekend_spending_peak`), disparada por volume de eventos processados.
+- `ip_blocklist` e middleware de bloqueio aplicado às rotas de autenticação.
+- Testes de parser, redação, executor, outbox/worker, opt-in e API de insights
+  (185 testes no total).
+
+### Changed
+
+- `src/config.ts` valida `AI_PROVIDER`, modelos e dimensões obrigatórios quando
+  a IA está ligada.
+- `src/app.ts` monta publisher, insights e bloqueio de IP; as rotas de insights
+  exigem autenticação.
+- `src/main.ts` cria o runtime de IA apenas quando habilitado, inicia o worker
+  após o catch-up de recorrências e o encerra no shutdown.
+- Serviços de transações, transferências, hábitos, investimentos, metas,
+  orçamentos, recorrências e autenticação publicam eventos no outbox.
+- OpenAPI ganhou a tag `Insights`.
+- README, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`,
+  `docs/PLAN.md` e `docs/erDiagram.mmd` atualizados para a Fase 7.
+
+### Security
+
+- IA é opt-in por usuário e desligada por padrão; sem provedor, a API continua
+  funcionando e o outbox permanece vazio.
+- O LLM nunca executa SQL: só pode chamar ferramentas registradas, validadas e
+  auditadas; ferramentas de risco alto exigem confiança ≥ 0.9.
+- Contexto enviado ao provider passa por redação de PII, inclusive no modo
+  Ollama local.
+- Insights, feedback e busca são sempre escopados pelo `user_id` da sessão;
+  acesso cruzado retorna `NOT_FOUND`.
+- Falha ao publicar evento é logada e nunca derruba a regra de negócio já
+  transacionada.
+
 ## [0.7.0] - 2026-11-05
 
 Sétima release: engajamento (Fase 6).

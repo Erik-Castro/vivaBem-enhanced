@@ -1,5 +1,6 @@
 import type { AppDatabase } from "../../db/client.ts";
 import { AppError } from "../../http/errors.ts";
+import type { EventPublisher } from "../../events/event-publisher.ts";
 import { todayUtc } from "../../shared/utils/date.ts";
 import { uuidv7 } from "../../shared/utils/uuid.ts";
 import type { Account, AccountsRepository } from "../accounts/accounts.repository.ts";
@@ -101,6 +102,7 @@ export interface InvestmentsServiceDependencies {
   readonly repository: InvestmentsRepository;
   readonly accounts: AccountsRepository;
   readonly preferences: UserPreferencesReader;
+  readonly events?: EventPublisher;
 }
 
 export class InvestmentsService {
@@ -108,12 +110,14 @@ export class InvestmentsService {
   readonly #repository: InvestmentsRepository;
   readonly #accounts: AccountsRepository;
   readonly #preferences: UserPreferencesReader;
+  readonly #events: EventPublisher | null;
 
   constructor(dependencies: InvestmentsServiceDependencies) {
     this.#db = dependencies.db;
     this.#repository = dependencies.repository;
     this.#accounts = dependencies.accounts;
     this.#preferences = dependencies.preferences;
+    this.#events = dependencies.events ?? null;
   }
 
   list(userId: string, assetClass?: string): Investment[] {
@@ -245,6 +249,23 @@ export class InvestmentsService {
         operationDate: candidate.operationDate,
         now,
       });
+
+      this.#events?.publish({
+        type: "investment.transaction.created",
+        aggregateType: "investment_transaction",
+        aggregateId: transactionId,
+        userId,
+        payload: {
+          investmentId,
+          transactionId,
+          ticker: investment.ticker,
+          operationType: candidate.operationType,
+          quantity: candidate.quantity,
+          unitPriceMinor: candidate.unitPriceMinor,
+          feesMinor: candidate.feesMinor,
+          operationDate: candidate.operationDate,
+        },
+      });
     });
 
     const created = this.#repository.findTransactionById(investmentId, transactionId);
@@ -321,7 +342,7 @@ export class InvestmentsService {
     investmentId: string,
     input: CreateInvestmentQuoteInput,
   ): InvestmentQuote {
-    this.#requireInvestment(userId, investmentId);
+    const investment = this.#requireInvestment(userId, investmentId);
 
     const quote: InvestmentQuote = {
       id: uuidv7(),
@@ -339,6 +360,22 @@ export class InvestmentsService {
       quotedAt: quote.quotedAt,
       source: quote.source,
       now: quote.createdAt,
+    });
+
+    this.#events?.publish({
+      type: "investment.quote.created",
+      aggregateType: "investment",
+      aggregateId: investmentId,
+      userId,
+      payload: {
+        investmentId,
+        ticker: investment.ticker,
+        quoteId: quote.id,
+        priceMinor: quote.priceMinor,
+        currencyCode: investment.currencyCode,
+        quotedAt: quote.quotedAt,
+        source: quote.source,
+      },
     });
 
     return quote;

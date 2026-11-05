@@ -15,6 +15,8 @@ import { securityHeaders } from "./http/middleware/security-headers.ts";
 import { csrfProtection } from "./http/middleware/csrf.ts";
 import { rateLimit } from "./http/middleware/rate-limit.ts";
 import { requireAuth } from "./http/middleware/auth.ts";
+import { ipBlocklist } from "./http/middleware/ip-blocklist.ts";
+import { EventPublisher } from "./events/event-publisher.ts";
 import { AuthRepository } from "./modules/auth/auth.repository.ts";
 import { AuthService } from "./modules/auth/auth.service.ts";
 import { registerAuthRoutes } from "./modules/auth/auth.controller.ts";
@@ -50,6 +52,10 @@ import { registerAchievementsRoutes } from "./modules/achievements/achievements.
 import { NotificationsRepository } from "./modules/notifications/notifications.repository.ts";
 import { NotificationsService } from "./modules/notifications/notifications.service.ts";
 import { registerNotificationsRoutes } from "./modules/notifications/notifications.controller.ts";
+import { InsightsRepository } from "./modules/insights/insights.repository.ts";
+import { InsightsService } from "./modules/insights/insights.service.ts";
+import { registerInsightsRoutes } from "./modules/insights/insights.controller.ts";
+import type { EmbeddingsService } from "./ai/embeddings.service.ts";
 import { evaluateAchievementsAfterMutation } from "./http/middleware/achievement-evaluation.ts";
 import { SlidingWindowRateLimiter } from "./shared/utils/rate-limiter.ts";
 import { API_VERSION, APP_VERSION } from "./version.ts";
@@ -58,6 +64,8 @@ export interface AppDependencies {
   readonly db: AppDatabase;
   readonly config: AppConfig;
   readonly logger: Logger;
+  /** Opcional: sem provider, a busca de insights cai para texto. */
+  readonly embeddings?: EmbeddingsService | null;
 }
 
 /**
@@ -66,7 +74,7 @@ export interface AppDependencies {
  * O banco, a configuração e o logger são injetados — os testes montam a app
  * com um banco temporário em vez de usar um singleton global.
  */
-export function createApp({ db, config, logger }: AppDependencies) {
+export function createApp({ db, config, logger, embeddings = null }: AppDependencies) {
   const app = new OpenAPIHono<AppEnv>({
     defaultHook: (result) => {
       if (!result.success) {
@@ -104,7 +112,15 @@ export function createApp({ db, config, logger }: AppDependencies) {
 
   const repository = new AuthRepository(db);
   const rateLimiter = new SlidingWindowRateLimiter();
-  const authService = new AuthService({ db, config, logger, repository, rateLimiter });
+  const events = new EventPublisher({ db, config, logger });
+  const authService = new AuthService({
+    db,
+    config,
+    logger,
+    repository,
+    rateLimiter,
+    events,
+  });
   const usersService = new UsersService(repository);
 
   const accountsRepository = new AccountsRepository(db);
@@ -121,6 +137,7 @@ export function createApp({ db, config, logger }: AppDependencies) {
     repository: transactionsRepository,
     accounts: accountsRepository,
     categories: categoriesRepository,
+    events,
   });
 
   const recurringRepository = new RecurringRepository(db);
@@ -130,6 +147,7 @@ export function createApp({ db, config, logger }: AppDependencies) {
     transactions: transactionsRepository,
     accounts: accountsRepository,
     categories: categoriesRepository,
+    events,
   });
 
   const budgetsRepository = new BudgetsRepository(db);
@@ -137,6 +155,7 @@ export function createApp({ db, config, logger }: AppDependencies) {
     repository: budgetsRepository,
     categories: categoriesRepository,
     preferences: repository,
+    events,
   });
 
   const goalsRepository = new GoalsRepository(db);
@@ -145,10 +164,11 @@ export function createApp({ db, config, logger }: AppDependencies) {
     repository: goalsRepository,
     accounts: accountsRepository,
     preferences: repository,
+    events,
   });
 
   const habitsRepository = new HabitsRepository(db);
-  const habitsService = new HabitsService({ db, repository: habitsRepository });
+  const habitsService = new HabitsService({ db, repository: habitsRepository, events });
 
   const investmentsRepository = new InvestmentsRepository(db);
   const investmentsService = new InvestmentsService({
@@ -156,10 +176,17 @@ export function createApp({ db, config, logger }: AppDependencies) {
     repository: investmentsRepository,
     accounts: accountsRepository,
     preferences: repository,
+    events,
   });
 
   const notificationsRepository = new NotificationsRepository(db);
   const notificationsService = new NotificationsService(notificationsRepository);
+
+  const insightsRepository = new InsightsRepository(db);
+  const insightsService = new InsightsService({
+    repository: insightsRepository,
+    embeddings,
+  });
 
   const achievementsRepository = new AchievementsRepository(db);
   const achievementsService = new AchievementsService({
@@ -169,6 +196,7 @@ export function createApp({ db, config, logger }: AppDependencies) {
     logger,
   });
 
+  app.use("/api/v1/auth/*", ipBlocklist(db));
   app.use("*", csrfProtection(config));
   app.use("/api/v1/auth/register", rateLimit(rateLimiter, config, { scope: "auth-register" }));
   app.use("/api/v1/auth/login", rateLimit(rateLimiter, config, { scope: "auth-login" }));
@@ -198,6 +226,8 @@ export function createApp({ db, config, logger }: AppDependencies) {
   app.use("/api/v1/achievements/*", requireAuth(repository, config));
   app.use("/api/v1/notifications", requireAuth(repository, config));
   app.use("/api/v1/notifications/*", requireAuth(repository, config));
+  app.use("/api/v1/insights", requireAuth(repository, config));
+  app.use("/api/v1/insights/*", requireAuth(repository, config));
 
   // Registrado depois dos guards: quando `next()` retorna, `userId` já existe.
   app.use("*", evaluateAchievementsAfterMutation(achievementsService, logger));
@@ -261,6 +291,7 @@ export function createApp({ db, config, logger }: AppDependencies) {
   registerInvestmentsRoutes(app, { service: investmentsService, config });
   registerAchievementsRoutes(app, { service: achievementsService, config });
   registerNotificationsRoutes(app, { service: notificationsService, config });
+  registerInsightsRoutes(app, { service: insightsService, config });
 
   app.get("/api/docs", swaggerUI({ url: `/api/${API_VERSION}/openapi.json` }));
 

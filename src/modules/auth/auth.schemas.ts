@@ -6,6 +6,7 @@ export const UserPreferencesSchema = z
     timezone: z.string().min(1).max(64),
     baseCurrency: z.string().regex(/^[A-Z]{3}$/),
     locale: z.string().regex(/^[a-z]{2}-[A-Z]{2}$/),
+    aiEnabled: z.boolean(),
   })
   .openapi("UserPreferences");
 
@@ -88,6 +89,7 @@ export const UpdatePreferencesRequestSchema = z
       .optional(),
     baseCurrency: z.string().regex(/^[A-Z]{3}$/, "Use um código ISO 4217, ex.: BRL").optional(),
     locale: z.string().regex(/^[a-z]{2}-[A-Z]{2}$/, "Use o formato pt-BR").optional(),
+    aiEnabled: z.boolean().optional(),
   })
   .refine((value) => Object.values(value).some((entry) => entry !== undefined), {
     message: "Informe ao menos um campo",

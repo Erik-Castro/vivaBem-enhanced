@@ -44,7 +44,8 @@ O binário do `sqlite-vector` é resolvido em três níveis
 2. pacote npm da plataforma;
 3. fallback embutido em `bin/sqlite-vector/`.
 
-`vector_init(...)` é chamado quando a tabela de embeddings existir (Fase 7).
+`vector_init(...)` é chamado de forma preguiçosa quando o runtime de IA está
+habilitado e a tabela `embedding_items` existe (Fase 7).
 
 ## Erros
 

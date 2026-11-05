@@ -25,6 +25,7 @@ erDiagram
         string timezone
         string base_currency
         string locale
+        boolean ai_enabled
         datetime updated_at
     }
 
@@ -223,25 +224,28 @@ erDiagram
     %% INTELIGÊNCIA ARTIFICIAL (EIE)
     %% ==========================
 
-    EVENT_QUEUE {
+    EVENT_OUTBOX {
         uuid id PK
         string type
+        string aggregate_type
         uuid aggregate_id
         uuid user_id FK
-        integer priority
-        string status "pending, processing, completed, failed"
         text payload
-        integer retry_count
-        datetime scheduled_for
+        string status "pending, processing, completed, failed"
+        integer priority
+        integer attempts
+        datetime available_at
         datetime locked_at
         string worker_id
+        text last_error
         datetime created_at
-        datetime updated_at
+        datetime processed_at
     }
 
     AI_ACTION_LOGS {
         uuid id PK
-        uuid event_id FK
+        uuid event_id
+        uuid user_id FK
         string tool
         text arguments
         real confidence
@@ -254,7 +258,7 @@ erDiagram
     AI_INSIGHTS {
         uuid id PK
         uuid user_id FK
-        string category "finance, habit, security, investment, recommendation"
+        string category "finance, habit, security, investment, recommendation, family, correlation"
         string severity "low, medium, high, critical"
         string title
         text message
@@ -262,6 +266,43 @@ erDiagram
         real confidence
         boolean is_read
         datetime created_at
+    }
+
+    AI_FEEDBACK {
+        uuid id PK
+        uuid insight_id FK
+        uuid user_id FK
+        string rating "helpful, not_helpful"
+        text comment
+        datetime created_at
+    }
+
+    EMBEDDING_ITEMS {
+        uuid id PK
+        uuid user_id FK
+        string source_type
+        uuid source_id
+        string content_hash
+        blob embedding
+        string model
+        integer dimensions
+        datetime created_at
+        datetime updated_at
+    }
+
+    IP_BLOCKLIST {
+        uuid id PK
+        string ip_address
+        text reason
+        datetime expires_at
+        datetime created_at
+    }
+
+    AI_CORRELATION_STATE {
+        uuid user_id PK,FK
+        datetime last_run_at
+        datetime created_at
+        datetime updated_at
     }
 
     %% ==========================
@@ -331,7 +372,10 @@ erDiagram
     HABIT_TRIGGERS ||--o{ HABIT_LOGS : justifica
 
     %% Relacionamentos Event Intelligence Engine (EIE)
-    USER_PROFILES ||--o{ EVENT_QUEUE : gera_eventos
+    USER_PROFILES ||--o{ EVENT_OUTBOX : gera_eventos
     USER_PROFILES ||--o{ AI_INSIGHTS : recebe_insights
     USER_PROFILES ||--o{ NOTIFICATIONS : recebe_notificacoes
-    EVENT_QUEUE ||--o{ AI_ACTION_LOGS : produz_auditoria
+    USER_PROFILES ||--o{ EMBEDDING_ITEMS : indexa
+    USER_PROFILES ||--o| AI_CORRELATION_STATE : acompanha
+    EVENT_OUTBOX ||--o{ AI_ACTION_LOGS : produz_auditoria
+    AI_INSIGHTS ||--o{ AI_FEEDBACK : recebe_feedback

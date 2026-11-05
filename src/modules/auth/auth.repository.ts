@@ -35,6 +35,8 @@ export interface UserPreferences {
   readonly timezone: string;
   readonly baseCurrency: string;
   readonly locale: string;
+  /** IA é opt-in: o usuário precisa autorizar o processamento dos eventos. */
+  readonly aiEnabled: boolean;
   readonly updatedAt: string;
 }
 
@@ -78,6 +80,7 @@ interface UserPreferencesRow {
   timezone: string;
   base_currency: string;
   locale: string;
+  ai_enabled: number;
   updated_at: string;
 }
 
@@ -278,6 +281,16 @@ export class AuthRepository {
       .run(now, sessionId);
   }
 
+  /** Revoga uma sessão apenas se ela pertencer ao usuário informado. */
+  revokeUserSession(userId: string, sessionId: string, now: string): boolean {
+    return this.db
+      .prepare<[string, string, string]>(
+        `UPDATE user_sessions SET revoked_at = ?
+         WHERE id = ? AND user_id = ? AND revoked_at IS NULL`,
+      )
+      .run(now, sessionId, userId).changes > 0;
+  }
+
   revokeSessionFamily(tokenFamilyId: string, now: string): void {
     this.db
       .prepare<[string, string]>(
@@ -331,6 +344,7 @@ export class AuthRepository {
       readonly timezone?: string;
       readonly baseCurrency?: string;
       readonly locale?: string;
+      readonly aiEnabled?: boolean;
     },
     now: string,
   ): UserPreferences | undefined {
@@ -338,15 +352,16 @@ export class AuthRepository {
     if (!current) return undefined;
 
     this.db
-      .prepare<[string, string, string, string, string]>(
+      .prepare<[string, string, string, number, string, string]>(
         `UPDATE user_preferences
-         SET timezone = ?, base_currency = ?, locale = ?, updated_at = ?
+         SET timezone = ?, base_currency = ?, locale = ?, ai_enabled = ?, updated_at = ?
          WHERE user_id = ?`,
       )
       .run(
         patch.timezone ?? current.timezone,
         patch.baseCurrency ?? current.baseCurrency,
         patch.locale ?? current.locale,
+        (patch.aiEnabled ?? current.aiEnabled) ? 1 : 0,
         now,
         userId,
       );
@@ -406,6 +421,7 @@ function mapPreferences(row: UserPreferencesRow): UserPreferences {
     timezone: row.timezone,
     baseCurrency: row.base_currency,
     locale: row.locale,
+    aiEnabled: row.ai_enabled === 1,
     updatedAt: row.updated_at,
   };
 }

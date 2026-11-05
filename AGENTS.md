@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos) e 6 (engajamento) concluídas, versão `0.7.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento) e 7 (eventos + IA) concluídas, versão `0.8.0`
 
 ---
 
@@ -44,7 +44,7 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`) e 6 (`0.7.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`) e 7 (`0.8.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -52,12 +52,14 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/shared/logger/` | logger JSON com redação de dados sensíveis |
 | `src/http/` | `AppError`, handler de erros, OpenAPI, middlewares |
 | `src/http/cookies.ts` | cookies `vb_access`, `vb_refresh`, `vb_csrf` e flags |
-| `src/http/middleware/` | request-id, logger, body-limit, security-headers, CORS, CSRF, rate-limit, auth |
+| `src/http/middleware/` | request-id, logger, body-limit, security-headers, CORS, CSRF, rate-limit, auth, ip-blocklist |
 | `src/shared/crypto/jwt.ts` | assinatura/verificação de access token HS256 |
 | `src/shared/crypto/tokens.ts` | token opaco, SHA-256, base64url, comparação constante |
 | `src/shared/utils/rate-limiter.ts` | janela deslizante em memória |
+| `src/events/` | outbox transacional, publisher e worker com lease/backoff/dead-letter |
+| `src/ai/` | providers, parser, redação, prompts, contexto, correlação, embeddings, executor, tools |
 | `src/modules/auth/` | repository, service e controller de identidade |
-| `src/modules/users/` | `/me`, preferências e sessões |
+| `src/modules/users/` | `/me`, preferências (incl. `aiEnabled`) e sessões |
 | `src/modules/accounts/` | contas, cartões, saldo e limite disponível |
 | `src/modules/categories/` | categorias, árvore e desativação em cascata |
 | `src/modules/transactions/` | transações, transferências, parcelas e resumos |
@@ -68,6 +70,8 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/modules/investments/` | ativos, operações, cotações, posições e performance |
 | `src/modules/achievements/` | catálogo, DSL de critérios, progresso e desbloqueio |
 | `src/modules/notifications/` | notificações escopadas, leitura e contagem |
+| `src/modules/insights/` | insights da IA, leitura, contagem, busca e feedback |
+| `src/modules/security/` | repositório de bloqueio de IP acionado pelas tools |
 | `src/shared/utils/date.ts` | datas de negócio, soma de meses com clamp, intervalos e dia ISO |
 | `src/db/client.ts` | conexão SQLite + extensão vetorial + transações |
 | `src/db/migrate.ts` | runner forward-only com checksum |
@@ -77,9 +81,10 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/db/migrations/004_habits.sql` | hábitos, logs diários e gatilhos |
 | `src/db/migrations/005_investments.sql` | ativos, operações e cotações |
 | `src/db/migrations/006_engagement.sql` | conquistas, progresso e notificações |
+| `src/db/migrations/007_ai.sql` | outbox, logs de IA, insights, feedback, embeddings e blocklist |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
-| `src/main.ts` | bootstrap: config → migrações → seed de conquistas → catch-up de recorrências → servidor |
-| `tests/` | unitários e integração com SQLite real (137 testes) |
+| `src/main.ts` | bootstrap: config → migrações → seed → catch-up → runtime de IA → servidor |
+| `tests/` | unitários e integração com SQLite real (185 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
@@ -269,6 +274,27 @@ src/modules/<dominio>/
 - O catálogo público (`GET /achievements`) esconde conquistas ocultas e não
   expõe `criteria_rule` nem `criteria_params`; o resumo usa o total de 352.
 
+### 5.8 Eventos e IA (Fase 7)
+
+- `event_outbox` é gravado na mesma transação da regra de negócio e só recebe
+  eventos quando `AI_ENABLED=true` **e** `user_preferences.ai_enabled=1`;
+  `EventPublisher.publish` devolve `null` quando a IA está desligada ou o
+  usuário não autorizou, então pode ser chamado sem condicional nos services.
+- O claim usa um único `UPDATE ... RETURNING`, incrementando `attempts`; o
+  worker recupera leases vencidos antes de cada ciclo, aplica backoff de 5s até
+  5min e envia para dead-letter quando `AI_MAX_RETRIES + 1` tentativas falham.
+- O processor indexa embeddings quando o tipo é `embedding.requested`; nos
+  demais eventos monta contexto via SQL, redige PII, chama o provider, valida a
+  resposta com Zod e delega as tool calls ao executor.
+- O executor valida schema, confiança mínima, risco alto (≥ 0.9), cooldown,
+  duplicidade de argumentos em 24h e audita tudo em `ai_action_logs`. Nenhuma
+  tool executa SQL arbitrário.
+- Insights são escopados por `user_id`; a busca usa vetores quando disponíveis
+  e cai para `LIKE` em título/mensagem antes da indexação terminar.
+- A correlação cross-domain (`habit_spending_link`, `weekend_spending_peak`) é
+  calculada em SQL e só agenda `correlation.check` após
+  `AI_CORRELATION_THRESHOLD` eventos concluídos desde a última execução.
+
 ---
 
 ## 6. Convenções de código
@@ -378,14 +404,16 @@ Regras:
 
 - **Nunca** publique evento fora do outbox. O evento nasce na mesma transação da regra.
 - Worker com claim atômico, lease, backoff, recuperação de travados e dead-letter.
-- Provider OpenAI-compatible via `fetch`; adapter Ollama opcional.
-- Parser robusto: remove ` thinking`/prosa, extrai JSON, valida com Zod, faz retry.
+- Provider OpenAI-compatible via `fetch`; adapter Ollama opcional via `AI_PROVIDER`.
+- Parser robusto: remove ` thinking`/prosa, extrai JSON e valida com Zod; falha de
+  parse vira retry no worker, não no parser.
 - Context builders calculam métricas em SQL; **o LLM nunca consulta o banco**.
 - O LLM **não executa SQL** nem regras de negócio; só sugere tool calls.
 - Executor valida parâmetros, autorização, cooldown, duplicidade e confiança; audita tudo.
 - `AI_ENABLED=false` por padrão em produção; IA é opt-in por usuário.
 - Redija PII antes de enviar a provider externo.
-- Embeddings em `embedding_items` com `vector_init` por conexão; gere de forma assíncrona.
+- Embeddings em `embedding_items` com `vector_init` preguiçoso quando a IA está
+  ligada; gere de forma assíncrona via `embedding.requested`.
 
 ---
 
@@ -423,6 +451,7 @@ Regras:
 - Quinta release: `0.5.0` (2026-11-05), publicada ao concluir a Fase 4.
 - Sexta release: `0.6.0` (2026-11-05), publicada ao concluir a Fase 5.
 - Sétima release: `0.7.0` (2026-11-05), publicada ao concluir a Fase 6.
+- Oitava release: `0.8.0` (2026-11-05), publicada ao concluir a Fase 7.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -527,8 +556,8 @@ deno test --coverage
 | 4 | Hábitos: CRUD, logs, streaks, calendário, triggers, stacking | ✅ `0.5.0` |
 | 5 | Investimentos: ativos, operações, posições, performance | ✅ `0.6.0` |
 | 6 | Engajamento: catálogo + DSL de critérios, notificações | ✅ `0.7.0` |
-| 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ⏳ próximo |
-| 8 | Dados e colaboração: import CSV/OFX, export, family links | ⬜ |
+| 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ✅ `0.8.0` |
+| 8 | Dados e colaboração: import CSV/OFX, export, family links | ⏳ próximo |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ⬜ |
 | 10 | Frontend Svelte 5 + Vite/PWA | ⬜ |
 
@@ -565,6 +594,16 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/modules/investments/` | Ativos, operações, cotações, posições e performance |
 | `src/modules/achievements/` | Catálogo, DSL de critérios, progresso e desbloqueio |
 | `src/modules/notifications/` | Notificações escopadas, leitura e contagem |
+| `src/modules/insights/` | Insights da IA, leitura, contagem, busca e feedback |
+| `src/modules/security/` | Bloqueio de IP acionado pelas tools |
+| `src/events/event-publisher.ts` | Publicação no outbox (opt-in e IA ligada) |
+| `src/events/worker.ts` | Claim, lease, backoff, dead-letter e correlação |
+| `src/ai/ai.processor.ts` | Orquestração de contexto, provider, parser e executor |
+| `src/ai/ai.executor.ts` | Validação, confiança, cooldown, dedupe e auditoria |
+| `src/ai/ai.redaction.ts` | Redação de PII antes do provider |
+| `src/ai/embeddings.service.ts` | Indexação assíncrona e busca vetorial |
+| `src/ai/ai.correlation.ts` | Padrões cross-domain e scheduler |
+| `src/http/middleware/ip-blocklist.ts` | Enforcement da blocklist de IP |
 | `src/http/middleware/achievement-evaluation.ts` | Avaliação após mutações autenticadas |
 | `src/db/migrations/` | Migrações SQL numeradas |
 | `bin/sqlite-vector/` | Binários de fallback da extensão vetorial |
