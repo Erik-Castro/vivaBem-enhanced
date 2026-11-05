@@ -1,0 +1,92 @@
+import { createRoute, z } from "@hono/zod-openapi";
+import type { OpenAPIHono } from "@hono/zod-openapi";
+import type { AppConfig } from "../config.ts";
+import { API_VERSION, APP_VERSION } from "../version.ts";
+import type { AppEnv } from "./types.ts";
+
+export const MetaSchema = z
+  .object({
+    requestId: z.string(),
+  })
+  .openapi("Meta");
+
+export const ErrorResponseSchema = z
+  .object({
+    error: z.object({
+      code: z.string(),
+      message: z.string(),
+      details: z.array(z.unknown()).optional(),
+      requestId: z.string(),
+    }),
+  })
+  .openapi("ErrorResponse");
+
+export const HealthResponseSchema = z
+  .object({
+    data: z.object({
+      status: z.literal("ok"),
+      version: z.string(),
+      uptimeSeconds: z.number().int().nonnegative(),
+    }),
+    meta: MetaSchema,
+  })
+  .openapi("HealthResponse");
+
+export const ReadyResponseSchema = z
+  .object({
+    data: z.object({
+      status: z.enum(["ready", "not_ready"]),
+      checks: z.object({
+        database: z.enum(["ok", "error"]),
+        migrations: z.number().int().nonnegative(),
+      }),
+    }),
+    meta: MetaSchema,
+  })
+  .openapi("ReadyResponse");
+
+export const healthRoute = createRoute({
+  method: "get",
+  path: "/health",
+  tags: ["System"],
+  summary: "Liveness probe",
+  description: "Retorna 200 enquanto o processo estiver vivo.",
+  responses: {
+    200: {
+      description: "Processo saudável",
+      content: { "application/json": { schema: HealthResponseSchema } },
+    },
+  },
+});
+
+export const readyRoute = createRoute({
+  method: "get",
+  path: "/ready",
+  tags: ["System"],
+  summary: "Readiness probe",
+  description: "Verifica a conexão com o banco e as migrações aplicadas.",
+  responses: {
+    200: {
+      description: "Pronto para receber tráfego",
+      content: { "application/json": { schema: ReadyResponseSchema } },
+    },
+    503: {
+      description: "Ainda não está pronto",
+      content: { "application/json": { schema: ReadyResponseSchema } },
+    },
+  },
+});
+
+export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppConfig): void {
+  app.doc31(`/api/${API_VERSION}/openapi.json`, {
+    openapi: "3.1.0",
+    info: {
+      title: "Viva Bem API",
+      version: APP_VERSION,
+      description: "API de finanças pessoais e hábitos do Viva Bem. " +
+        "Todas as respostas de sucesso usam `{ data, meta }`; erros usam `{ error }`.",
+    },
+    servers: [{ url: config.appOrigin, description: config.env }],
+    tags: [{ name: "System", description: "Saúde e prontidão do serviço" }],
+  });
+}

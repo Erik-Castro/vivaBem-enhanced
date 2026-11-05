@@ -1,0 +1,32 @@
+# Deno
+.deno/
+node_modules/
+coverage/
+
+# Build
+build/
+dist/
+
+# Banco de dados local
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Ferramentas locais
+.codegraph/
+
+# Projeto legado (somente leitura)
+reference_only/
+
+# Editor / SO
+.DS_Store
+*.swp
+.idea/
+.vscode/

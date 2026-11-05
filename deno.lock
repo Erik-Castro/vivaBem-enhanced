@@ -1,0 +1,175 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/assert@^1.0.19": "1.0.19",
+    "jsr:@std/internal@^1.0.12": "1.0.14",
+    "npm:@hono/swagger-ui@*": "0.6.2_hono@4.13.16",
+    "npm:@hono/swagger-ui@~0.6.2": "0.6.2_hono@4.13.16",
+    "npm:@hono/zod-openapi@*": "1.6.3_hono@4.13.16_zod@4.6.7",
+    "npm:@hono/zod-openapi@^1.6.3": "1.6.3_hono@4.13.16_zod@4.6.7",
+    "npm:@rabbit-company/argon2id@*": "2.1.0_typescript@5.9.3",
+    "npm:@rabbit-company/argon2id@^2.1.0": "2.1.0_typescript@5.9.3",
+    "npm:@sqliteai/sqlite-vector@*": "1.2.0",
+    "npm:@sqliteai/sqlite-vector@^1.2.0": "1.2.0",
+    "npm:@types/better-sqlite3@*": "7.6.13",
+    "npm:@types/better-sqlite3@^7.6.13": "7.6.13",
+    "npm:better-sqlite3@*": "13.0.3",
+    "npm:better-sqlite3@13.0.3": "13.0.3",
+    "npm:better-sqlite3@^13.0.3": "13.0.3",
+    "npm:hono@^4.13.16": "4.13.16",
+    "npm:zod@*": "4.6.7",
+    "npm:zod@^4.6.7": "4.6.7"
+  },
+  "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.14": {
+      "integrity": "291516b3d4c35024d6ffbc0a9df5bf4c64116e05b50012cf846710152d2ffdf7"
+    }
+  },
+  "npm": {
+    "@asteasolutions/zod-to-openapi@9.1.0_zod@4.6.7": {
+      "integrity": "sha512-pLMeRgRYS7/vZIgAAkOe2P6+XGTifR1MT9pqDoxZ11EmcJJ+DPmdPqLN8ZZF4U8R9KHCCQCS9c2wtuE8wSrfkw==",
+      "dependencies": [
+        "openapi3-ts",
+        "zod"
+      ]
+    },
+    "@hono/swagger-ui@0.6.2_hono@4.13.16": {
+      "integrity": "sha512-EDLlBS+LwpAhhh5K45YH85Yyk9GJuD2E7rKdjTZsBObksXaBz+8jPsen5XZqOS9unw6H1CDq0LKzp0c51K6lsA==",
+      "dependencies": [
+        "hono"
+      ]
+    },
+    "@hono/zod-openapi@1.6.3_hono@4.13.16_zod@4.6.7": {
+      "integrity": "sha512-VYR82Y60plu8g3pN60OUXMVKpmxh3R04Qs++3DY9vtwZ9/sA/BRY0PcRIR+Z37/3itWtM7pYwT9bKiH9JhqV6Q==",
+      "dependencies": [
+        "@asteasolutions/zod-to-openapi",
+        "@hono/zod-validator",
+        "hono",
+        "openapi3-ts",
+        "zod"
+      ]
+    },
+    "@hono/zod-validator@0.9.1_hono@4.13.16_zod@4.6.7": {
+      "integrity": "sha512-iiv6w0qrIc0arfvCtUqBWsvl4fXjzaTcQcCJTTtCnkawF9HHGE+KjEl0ox3gQJ6rKZEgE3mLExlQCF72M+mNuw==",
+      "dependencies": [
+        "hono",
+        "zod"
+      ]
+    },
+    "@rabbit-company/argon2id@2.1.0_typescript@5.9.3": {
+      "integrity": "sha512-X/kt89qjmS9+Zh+DYCGcWeTwHa4C8vY8T3EnSma+vWj7spMzAYX4F8vmGUkny9hygpTOeC/yXwAUdJAfJ52H+w==",
+      "dependencies": [
+        "typescript"
+      ]
+    },
+    "@sqliteai/sqlite-vector-darwin-arm64@1.2.0": {
+      "integrity": "sha512-k5/wMDAxNQLF4MnJ5lk2rMpuLaZ0nz6J+VZwxVirZpQKGojR05WxneUsdoSjcYoiIaaHhAo4xMSQXyj6AXia9A==",
+      "os": ["darwin"],
+      "cpu": ["arm64"]
+    },
+    "@sqliteai/sqlite-vector-darwin-x86_64@1.2.0": {
+      "integrity": "sha512-uNiGl4LUZL+v5gfmOl88LW6PXrARaYaHlbZRlML6q/HDUqvsUO9vlL7hb+T2uMFjHchidAVv9IEuR8Aw3XX5bg==",
+      "os": ["darwin"],
+      "cpu": ["x64", "ia32"]
+    },
+    "@sqliteai/sqlite-vector-linux-arm64-musl@1.2.0": {
+      "integrity": "sha512-gZZpbWxBr3Z3/ACRhsoAc2k9UU5fgao+dkSUOen/rxwh1ajyhA70umXY8OZQPr/DSGXfVORwxGi+Pe/xsHEXug==",
+      "os": ["linux"],
+      "cpu": ["arm64"]
+    },
+    "@sqliteai/sqlite-vector-linux-arm64@1.2.0": {
+      "integrity": "sha512-+/o7c+BJkfbw2+5cYtULCsFuO19Pz7JiPWeRRsc6d/E5k9AgDxFyV9spfpz+7tLv5ZgdvuewfhJgYDnY8hY3DQ==",
+      "os": ["linux"],
+      "cpu": ["arm64"]
+    },
+    "@sqliteai/sqlite-vector-linux-x86_64-musl@1.2.0": {
+      "integrity": "sha512-V2CXpWEnuosApZcUM6HfKsz9ziXVh4M2XZ24lQ4smTzvGO3Dl3qhe2NX6DgibuUDjh36AhLLwbZpASgQ5jyYUQ==",
+      "os": ["linux"],
+      "cpu": ["x64", "ia32"]
+    },
+    "@sqliteai/sqlite-vector-linux-x86_64@1.2.0": {
+      "integrity": "sha512-ZJ6UwxDieUO5lTUKkVWcwKAdeUW7wwJgQw7R4UZRkaTLoA6rj0TL16+BSYIkHDgM05sJLZ53evdChes3tD6kWA==",
+      "os": ["linux"],
+      "cpu": ["x64", "ia32"]
+    },
+    "@sqliteai/sqlite-vector-win32-x86_64@1.2.0": {
+      "integrity": "sha512-TJz6Obwm9xEPz8aer2c01sZSCMzgxguGknj7ayIH9BQl9fo08haKZjQePwfShCFEcdNjPK2xuMWvA2OJx2znLg==",
+      "os": ["win32"],
+      "cpu": ["x64", "ia32"]
+    },
+    "@sqliteai/sqlite-vector@1.2.0": {
+      "integrity": "sha512-REhArFzTny421EGW8u4c2IYJNxStmmuGFktVKe19PuptWgHItYVTbEdIF6BoEBPIt6hUQ1ZCLQ2XzJpVehD9Mw==",
+      "optionalDependencies": [
+        "@sqliteai/sqlite-vector-darwin-arm64",
+        "@sqliteai/sqlite-vector-darwin-x86_64",
+        "@sqliteai/sqlite-vector-linux-arm64",
+        "@sqliteai/sqlite-vector-linux-arm64-musl",
+        "@sqliteai/sqlite-vector-linux-x86_64",
+        "@sqliteai/sqlite-vector-linux-x86_64-musl",
+        "@sqliteai/sqlite-vector-win32-x86_64"
+      ]
+    },
+    "@types/better-sqlite3@7.6.13": {
+      "integrity": "sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==",
+      "dependencies": [
+        "@types/node"
+      ]
+    },
+    "@types/node@26.6.6": {
+      "integrity": "sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
+    "better-sqlite3@13.0.3": {
+      "integrity": "sha512-RbOBxmLBG8uvFUc15X9+9SFemKcQ0WBuISBVkpuiaUB2qblC8UWlHEjdWVoZ8AdhSwmoEgsiXKfopX0CQxaACQ==",
+      "dependencies": [
+        "node-addon-api"
+      ]
+    },
+    "hono@4.13.16": {
+      "integrity": "sha512-AOLOEhvrV+iH92xXCnFr/5+3KjPKcI3xP63XJtX5spAnkznPdHijlIsUTpi7/9EhWqrTCekw5c5zh1K+YsVw7A=="
+    },
+    "node-addon-api@8.9.2": {
+      "integrity": "sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg=="
+    },
+    "openapi3-ts@4.6.2": {
+      "integrity": "sha512-gyyil3DweqhXiEhTqtAs9wwRLfWHmetwhI4kmM5Rn0d6gtmK863Ki7qqbQnp9+Wwlqoe3B1LFWj7kMp5ctE4rQ==",
+      "dependencies": [
+        "yaml"
+      ]
+    },
+    "typescript@5.9.3": {
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+      "bin": true
+    },
+    "undici-types@8.9.0": {
+      "integrity": "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg=="
+    },
+    "yaml@2.9.1": {
+      "integrity": "sha512-3NxN8+78OdzbT7C/WjGsyfPAtJaN3FNDsWxv7Y7mcDsT/oOmgW8BpyQQFFBnvZE3j9Y2Sdz1ULFLezL7Eb2yFw==",
+      "bin": true
+    },
+    "zod@4.6.7": {
+      "integrity": "sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@^1.0.19",
+      "npm:@hono/swagger-ui@~0.6.2",
+      "npm:@hono/zod-openapi@^1.6.3",
+      "npm:@rabbit-company/argon2id@^2.1.0",
+      "npm:@sqliteai/sqlite-vector@^1.2.0",
+      "npm:better-sqlite3@^13.0.3",
+      "npm:hono@^4.13.16",
+      "npm:zod@^4.6.7"
+    ]
+  }
+}

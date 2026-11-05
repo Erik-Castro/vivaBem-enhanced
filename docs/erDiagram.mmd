@@ -1,0 +1,334 @@
+erDiagram
+    USER_PROFILES {
+        uuid id PK
+        string name
+        string avatar_url
+        string subscription_tier
+        datetime created_at
+        datetime updated_at
+    }
+
+    USER_CREDENTIALS {
+        uuid id PK
+        uuid user_id FK
+        string email UK
+        string password_hash
+        string password_algorithm
+        boolean email_verified
+        datetime last_login_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    USER_PREFERENCES {
+        uuid user_id PK,FK
+        string timezone
+        string base_currency
+        string locale
+        datetime updated_at
+    }
+
+    USER_SESSIONS {
+        uuid id PK
+        uuid user_id FK
+        string refresh_token_hash
+        string ip_address
+        string user_agent
+        datetime expires_at
+        datetime created_at
+    }
+
+    %% ==========================
+    %% FINANCEIRO
+    %% ==========================
+
+    ACCOUNTS {
+        uuid id PK
+        uuid user_id FK
+        string name
+        string type
+        string currency_code
+        boolean is_active
+        datetime created_at
+    }
+
+    CREDIT_CARD_DETAILS {
+        uuid account_id PK,FK
+        integer closing_day
+        integer due_day
+        numeric limit_amount
+    }
+
+    CATEGORIES {
+        uuid id PK
+        uuid user_id FK
+        uuid parent_id FK
+        string name
+        string type
+        string color
+        boolean is_active
+        datetime created_at
+    }
+
+    TRANSACTIONS {
+        uuid id PK
+        uuid account_id FK
+        uuid category_id FK
+        uuid transfer_group_id
+        string type
+        numeric amount
+        string description
+        date transaction_date
+        boolean is_cleared
+        datetime created_at
+    }
+
+    CREDIT_CARD_TRANSACTIONS {
+        uuid id PK
+        uuid transaction_id FK
+        integer installment_number
+        integer total_installments
+        uuid installment_group_id
+    }
+
+    INVESTMENTS {
+        uuid id PK
+        uuid user_id FK
+        string ticker
+        string name
+        string asset_class
+        string currency_code
+        datetime created_at
+    }
+
+    INVESTMENT_TRANSACTIONS {
+        uuid id PK
+        uuid investment_id FK
+        uuid account_id FK
+        string operation_type
+        numeric quantity
+        numeric unit_price
+        numeric fees
+        date operation_date
+        datetime created_at
+    }
+
+    %% ==========================
+    %% PLANEJAMENTO FINANCEIRO
+    %% ==========================
+
+    BUDGETS {
+        uuid id PK
+        uuid user_id FK
+        uuid category_id FK
+        string name
+        numeric limit_amount
+        string period_type "monthly, yearly, custom"
+        date start_date
+        date end_date
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+
+    GOALS {
+        uuid id PK
+        uuid user_id FK
+        uuid target_account_id FK
+        string name
+        text description
+        numeric target_amount
+        string currency_code
+        date target_date
+        string status "active, paused, completed"
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% ==========================
+    %% HÁBITOS
+    %% ==========================
+
+    HABITS {
+        uuid id PK
+        uuid user_id FK
+        string name
+        text description
+        string color
+        string habit_type
+        string frequency_type
+        string days_of_week
+        integer daily_target
+        string target_unit
+        integer order_index
+        boolean is_active
+        uuid parent_habit_id FK
+        datetime created_at
+        datetime updated_at
+    }
+
+    HABIT_LOGS {
+        uuid id PK
+        uuid habit_id FK
+        date log_date
+        integer value
+        text note
+        uuid trigger_id FK
+        boolean replacement_used
+        datetime created_at
+        datetime updated_at
+    }
+
+    HABIT_TRIGGERS {
+        uuid id PK
+        uuid user_id FK
+        uuid bad_habit_id FK
+        uuid replacement_habit_id FK
+        text trigger_description
+        text alternative_action
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% ==========================
+    %% GAMIFICAÇÃO E ENGAJAMENTO
+    %% ==========================
+
+    ACHIEVEMENTS {
+        uuid id PK
+        string title
+        text description
+        string category
+        integer points_reward
+        string badge_icon_url
+        string criteria_rule
+        integer target_metric
+        boolean is_hidden
+        datetime created_at
+    }
+
+    USER_ACHIEVEMENTS {
+        uuid id PK
+        uuid user_id FK
+        uuid achievement_id FK
+        integer current_progress
+        boolean is_unlocked
+        datetime unlocked_at
+    }
+
+    %% ==========================
+    %% INTELIGÊNCIA ARTIFICIAL (EIE)
+    %% ==========================
+
+    EVENT_QUEUE {
+        uuid id PK
+        string type
+        uuid aggregate_id
+        uuid user_id FK
+        integer priority
+        string status "pending, processing, completed, failed"
+        text payload
+        integer retry_count
+        datetime scheduled_for
+        datetime locked_at
+        string worker_id
+        datetime created_at
+        datetime updated_at
+    }
+
+    AI_ACTION_LOGS {
+        uuid id PK
+        uuid event_id FK
+        string tool
+        text arguments
+        real confidence
+        boolean executed
+        integer execution_time_ms
+        text error
+        datetime created_at
+    }
+
+    AI_INSIGHTS {
+        uuid id PK
+        uuid user_id FK
+        string category "finance, habit, security, investment, recommendation"
+        string severity "low, medium, high, critical"
+        string title
+        text message
+        string source_event
+        real confidence
+        boolean is_read
+        datetime created_at
+    }
+
+    %% ==========================
+    %% SISTEMA / INFRAESTRUTURA
+    %% ==========================
+
+    NOTIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        string title
+        text message
+        string category "finance, habit, security, system"
+        string severity "low, medium, high, critical"
+        string link
+        boolean is_read
+        datetime created_at
+    }
+
+    SCHEMA_VERSIONS {
+        integer version_id PK
+        string migration_name
+        string checksum
+        datetime applied_at
+        integer execution_time_ms
+    }
+
+    %% ==========================
+    %% RELACIONAMENTOS
+    %% ==========================
+
+    USER_PROFILES ||--|| USER_CREDENTIALS : possui
+    USER_PROFILES ||--|| USER_PREFERENCES : possui
+    USER_PROFILES ||--o{ USER_SESSIONS : abre
+
+    USER_PROFILES ||--o{ ACCOUNTS : possui
+    USER_PROFILES ||--o{ CATEGORIES : cria
+    USER_PROFILES ||--o{ INVESTMENTS : monitora
+    
+    %% Relacionamentos Planejamento Financeiro
+    USER_PROFILES ||--o{ BUDGETS : define
+    USER_PROFILES ||--o{ GOALS : planeja
+
+    USER_PROFILES ||--o{ HABITS : possui
+    USER_PROFILES ||--o{ HABIT_TRIGGERS : configura
+    
+    USER_PROFILES ||--o{ USER_ACHIEVEMENTS : conquista
+    ACHIEVEMENTS ||--o{ USER_ACHIEVEMENTS : concedido
+
+    ACCOUNTS ||--|| CREDIT_CARD_DETAILS : estende
+    ACCOUNTS ||--o{ TRANSACTIONS : possui
+    ACCOUNTS ||--o{ INVESTMENT_TRANSACTIONS : liquida
+    ACCOUNTS ||--o{ GOALS : destina_a
+
+    CATEGORIES ||--o{ TRANSACTIONS : classifica
+    CATEGORIES ||--o{ CATEGORIES : aninha
+    CATEGORIES ||--o{ BUDGETS : limita
+
+    TRANSACTIONS ||--o| CREDIT_CARD_TRANSACTIONS : parcela
+
+    INVESTMENTS ||--o{ INVESTMENT_TRANSACTIONS : registra
+
+    HABITS ||--o{ HABIT_LOGS : gera
+    HABITS ||--o{ HABITS : empilha
+    HABITS ||--o{ HABIT_TRIGGERS : ruim
+    HABITS ||--o{ HABIT_TRIGGERS : substituto
+
+    HABIT_TRIGGERS ||--o{ HABIT_LOGS : justifica
+
+    %% Relacionamentos Event Intelligence Engine (EIE)
+    USER_PROFILES ||--o{ EVENT_QUEUE : gera_eventos
+    USER_PROFILES ||--o{ AI_INSIGHTS : recebe_insights
+    USER_PROFILES ||--o{ NOTIFICATIONS : recebe_notificacoes
+    EVENT_QUEUE ||--o{ AI_ACTION_LOGS : produz_auditoria

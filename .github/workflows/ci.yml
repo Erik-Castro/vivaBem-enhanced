@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    name: Qualidade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.8
+
+      - name: Instalar dependências
+        run: deno install --frozen
+
+      - name: Formatação
+        run: deno fmt --check
+
+      - name: Lint
+        run: deno lint
+
+      - name: Typecheck
+        run: deno check src tests scripts
+
+      - name: Versão e changelog
+        run: deno task check:release
+
+      - name: Testes
+        run: deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi tests/
+
+  docker:
+    name: Imagem Docker
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: docker build -t vivabem:ci .
