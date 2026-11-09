@@ -11,6 +11,53 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.10.0] - 2026-11-09
+
+Décima release: hardening e operação (Fase 9).
+
+### Added
+
+- Migração `009_hardening.sql` com `idx_user_sessions_expires` e o índice
+  parcial `idx_event_outbox_cleanup`, que tornam a limpeza periódica barata.
+- Manutenção operacional no boot e a cada 24h (`src/db/maintenance.ts`):
+  remove sessões expiradas, eventos de outbox concluídos com mais de 30 dias,
+  bloqueios de IP vencidos e embeddings de insights inexistentes. Nenhum dado
+  de domínio do usuário é apagado; falhas são logadas sem derrubar o processo.
+- `src/db/backup.ts` extrai o backup com `VACUUM INTO`; a CLI
+  `deno task db:backup` passa a reutilizar o mesmo módulo testável.
+- Testes de integração para manutenção, backup (snapshot consultável e
+  independente) e headers de segurança/rate limit de import/export.
+- Testes E2E de rede real com `Deno.serve` em porta aleatória e cliente HTTP
+  com cookie jar: fluxo register → login → conta → transação → resumo →
+  logout → export e detecção de reuso de refresh token.
+- `compose.yaml` com build, volumes de dados/backups, healthcheck, shutdown
+  gracioso e `AI_ENABLED=false` por padrão; alvos `make deploy`, `up`, `down`
+  e `logs`.
+- `docs/API.md` com convenções, autenticação, erros e grupos de rotas;
+  `docs/DEPLOY.md` reescrito com deploy em um comando, backup agendado,
+  restore testado, manutenção e checklist de produção.
+- Cobertura de testes no CI, com relatório e artefato LCOV.
+
+### Changed
+
+- `RATE_LIMIT_DATA_MAX` (padrão 30/min por IP) limita importação e exportação,
+  separado do limite rígido de autenticação.
+- Tasks de teste incluem `--allow-net` para os E2E de rede real, sem
+  `--allow-all`.
+- `securityHeaders` adiciona `Cross-Origin-Opener-Policy`,
+  `X-Permitted-Cross-Domain-Policies`, CSP `default-src 'none'` e
+  `Cache-Control: no-store` nas respostas de API; `/api/docs` fica sem CSP para
+  o Swagger UI funcionar.
+
+### Security
+
+- Respostas de API não são cacheáveis e não podem ser enquadradas ou carregar
+  recursos externos.
+- Limpeza periódica reduz a janela de sessões expiradas, eventos antigos,
+  bloqueios vencidos e embeddings órfãos.
+- CI valida formatação, lint, typecheck, versão/changelog, testes com cobertura
+  e build da imagem Docker.
+
 ## [0.9.0] - 2026-11-09
 
 Nona release: dados e colaboração (Fase 8).

@@ -31,8 +31,21 @@ jobs:
       - name: Versão e changelog
         run: deno task check:release
 
-      - name: Testes
-        run: deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi tests/
+      - name: Testes com cobertura
+        run: deno task test:coverage
+
+      - name: Relatório de cobertura
+        run: deno coverage coverage
+
+      - name: Exportar LCOV
+        run: deno coverage coverage --lcov --output=coverage.lcov
+
+      - name: Publicar cobertura
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: coverage.lcov
+          if-no-files-found: error
 
   docker:
     name: Imagem Docker

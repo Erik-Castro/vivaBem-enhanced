@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA) e 8 (dados e colaboração) concluídas, versão `0.9.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`
 
 ---
 
@@ -44,7 +44,7 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`) e 8 (`0.9.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`), 8 (`0.9.0`) e 9 (`0.10.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -325,6 +325,28 @@ src/modules/<dominio>/
 - Convite, aceite, recusa e revogação geram notificação para o outro lado;
   qualquer acesso cruzado a um vínculo retorna `NOT_FOUND`.
 
+### 5.10 Hardening e operação (Fase 9)
+
+- A manutenção (`src/db/maintenance.ts`) roda no boot e a cada 24h, dentro de
+  uma transação, e remove apenas dados operacionais: sessões expiradas, eventos
+  de outbox concluídos com mais de 30 dias, bloqueios de IP vencidos e
+  embeddings cujo insight de origem não existe. Falha é logada e não derruba o
+  processo.
+- `idx_user_sessions_expires` e o índice parcial `idx_event_outbox_cleanup`
+  (migração `009_hardening.sql`) sustentam a limpeza sem varrer tabelas.
+- O backup usa `VACUUM INTO` em `src/db/backup.ts`, produzindo snapshot
+  consistente com WAL ativo; a CLI `db:backup` reutiliza o mesmo módulo.
+- Headers de API incluem CSP `default-src 'none'`, `Cache-Control: no-store`,
+  COOP e `X-Permitted-Cross-Domain-Policies`; `/api/docs` fica sem CSP para o
+  Swagger UI.
+- `RATE_LIMIT_DATA_MAX` (padrão 30/min por IP) limita importação e exportação,
+  separado de `RATE_LIMIT_AUTH_MAX`.
+- E2E usam `Deno.serve` em porta aleatória (`tests/helpers/server.ts`) e um
+  cliente com cookie jar, exercitando sockets, cookies e shutdown reais.
+- `compose.yaml` + `make deploy` entregam build, volumes de dados/backups,
+  healthcheck, shutdown gracioso e deploy em um comando; o CI publica cobertura
+  LCOV.
+
 ---
 
 ## 6. Convenções de código
@@ -483,6 +505,7 @@ Regras:
 - Sétima release: `0.7.0` (2026-11-05), publicada ao concluir a Fase 6.
 - Oitava release: `0.8.0` (2026-11-05), publicada ao concluir a Fase 7.
 - Nona release: `0.9.0` (2026-11-09), publicada ao concluir a Fase 8.
+- Décima release: `0.10.0` (2026-11-09), publicada ao concluir a Fase 9.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -589,7 +612,7 @@ deno test --coverage
 | 6 | Engajamento: catálogo + DSL de critérios, notificações | ✅ `0.7.0` |
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ✅ `0.8.0` |
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ✅ `0.9.0` |
-| 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ⏳ próximo |
+| 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ✅ `0.10.0` |
 | 10 | Frontend Svelte 5 + Vite/PWA | ⬜ |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
@@ -607,6 +630,9 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/config.ts` | Configuração validada com Zod |
 | `src/db/client.ts` | Conexão SQLite + extensão vetorial |
 | `src/db/migrate.ts` | Runner de migrações forward-only |
+| `src/db/maintenance.ts` | Limpeza operacional (sessões, outbox, IPs, embeddings) |
+| `src/db/backup.ts` | Backup consistente com `VACUUM INTO` |
+| `src/db/backup-cli.ts` | CLI `deno task db:backup` |
 | `src/app.ts` | Factory do Hono |
 | `src/main.ts` | Bootstrap da aplicação |
 | `src/http/cookies.ts` | Cookies de autenticação e CSRF |
@@ -641,8 +667,13 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/http/middleware/achievement-evaluation.ts` | Avaliação após mutações autenticadas |
 | `src/db/migrations/` | Migrações SQL numeradas |
 | `bin/sqlite-vector/` | Binários de fallback da extensão vetorial |
+| `compose.yaml` | Deploy local/host em um comando (build, volumes, healthcheck) |
 | `Dockerfile` | Imagem multi-stage não-root |
-| `.github/workflows/ci.yml` | CI (qualidade + build Docker) |
+| `.github/workflows/ci.yml` | CI (qualidade, cobertura + build Docker) |
+| `tests/helpers/server.ts` | Servidor real em porta aleatória + cliente com cookie jar |
+| `tests/e2e/` | Fluxo completo e reuso de refresh token |
+| `docs/API.md` | Convenções, auth, erros e grupos de rotas |
+| `docs/DEPLOY.md` | Deploy, backup, restore, manutenção e checklist |
 | `reference_only/` | Projeto antigo, somente leitura |
 
 ---

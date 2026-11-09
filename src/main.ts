@@ -2,6 +2,7 @@ import { type AppConfig, ConfigError, loadConfig } from "./config.ts";
 import { createLogger } from "./shared/logger/index.ts";
 import { createDatabase } from "./db/client.ts";
 import { loadMigrations, migrate, MigrationError } from "./db/migrate.ts";
+import { runMaintenance } from "./db/maintenance.ts";
 import { createApp } from "./app.ts";
 import { APP_VERSION } from "./version.ts";
 import { RecurringRepository } from "./modules/recurring/recurring.repository.ts";
@@ -68,6 +69,21 @@ try {
   if (error instanceof MigrationError) fatal(error.message);
   fatal(error instanceof Error ? error.message : String(error));
 }
+
+/** Limpeza operacional: sessões expiradas, outbox antigo, IPs e embeddings. */
+function applyMaintenance(): void {
+  try {
+    const result = runMaintenance(db);
+    logger.info("maintenance_complete", { ...result });
+  } catch (error) {
+    logger.error("maintenance_failed", {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+applyMaintenance();
+const maintenanceTimer = setInterval(applyMaintenance, 24 * 60 * 60 * 1_000);
 
 /**
  * Monta o pipeline de IA quando habilitado. Sem `AI_ENABLED`, retorna `null`:
@@ -175,6 +191,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info("shutdown_started", { signal });
 
   aiRuntime?.worker.stop();
+  clearInterval(maintenanceTimer);
 
   try {
     await server.shutdown();

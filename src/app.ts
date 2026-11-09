@@ -223,6 +223,15 @@ export function createApp({ db, config, logger, embeddings = null }: AppDependen
   app.use("/api/v1/auth/login", rateLimit(rateLimiter, config, { scope: "auth-login" }));
   app.use("/api/v1/auth/refresh", rateLimit(rateLimiter, config, { scope: "auth-refresh" }));
   app.use("/api/v1/auth/logout", rateLimit(rateLimiter, config, { scope: "auth-logout" }));
+  // Importação e exportação são as rotas mais caras: limite próprio por IP.
+  app.use(
+    "/api/v1/import/*",
+    rateLimit(rateLimiter, config, { scope: "import", max: config.rateLimit.dataMax }),
+  );
+  app.use(
+    "/api/v1/export/*",
+    rateLimit(rateLimiter, config, { scope: "export", max: config.rateLimit.dataMax }),
+  );
   app.use("/api/v1/me", requireAuth(repository, config));
   app.use("/api/v1/me/*", requireAuth(repository, config));
   app.use("/api/v1/accounts", requireAuth(repository, config));

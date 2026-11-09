@@ -619,8 +619,8 @@ Worker (claim/lease)
 
 **Total da API: ~31–43 dias.** Frontend Svelte 5 + Vite/PWA: ~15–20 dias (plano separado).
 
-Fases 0 a 8 concluídas e publicadas de `0.1.0` a `0.9.0`. A Fase 9 (hardening)
-é a próxima.
+Fases 0 a 9 concluídas e publicadas de `0.1.0` a `0.10.0`. A próxima é a Fase 10
+(frontend Svelte 5 + Vite/PWA).
 
 ---
 
@@ -802,5 +802,5 @@ deno task release -- patch|minor|major
 
 ## 16. Próximo passo
 
-Iniciar a **Fase 9** (hardening): segurança, E2E, cobertura, índices, backups,
-documentação e deploy.
+Iniciar a **Fase 10** (frontend Svelte 5 + Vite/PWA). A API está congelada em
+`/api/v1`; mudanças de contrato exigem `/api/v2` + release MAJOR.

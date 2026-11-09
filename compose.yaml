@@ -1,0 +1,43 @@
+services:
+  vivabem:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-0.10.0}
+    image: vivabem:${VERSION:-0.10.0}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      ENV: production
+      PORT: "3000"
+      DATABASE_PATH: /app/data/app.db
+      APP_ORIGIN: ${APP_ORIGIN:?defina APP_ORIGIN no .env ou no ambiente}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env ou no ambiente}
+      COOKIE_SECURE: "true"
+      AI_ENABLED: ${AI_ENABLED:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      # O SQLite e os backups vivem fora do container.
+      - vivabem-data:/app/data
+      - vivabem-backups:/app/backups
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "deno",
+          "eval",
+          "const r = await fetch('http://127.0.0.1:3000/health'); if (!r.ok) Deno.exit(1);",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  # Nomes fixos para o restore e o backup apontarem sempre para o mesmo lugar.
+  vivabem-data:
+    name: vivabem-data
+  vivabem-backups:
+    name: vivabem-backups

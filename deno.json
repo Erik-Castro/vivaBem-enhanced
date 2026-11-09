@@ -1,10 +1,10 @@
 {
-  "version": "0.9.0",
+  "version": "0.10.0",
   "tasks": {
     "dev": "deno run --env-file-if-exists=.env --watch --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/main.ts",
     "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/main.ts",
-    "test": "deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi tests/",
-    "test:coverage": "deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi --coverage tests/",
+    "test": "deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi --allow-net tests/",
+    "test:coverage": "deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi --allow-net --coverage tests/",
     "check": "deno check src tests scripts",
     "lint": "deno lint",
     "fmt": "deno fmt",

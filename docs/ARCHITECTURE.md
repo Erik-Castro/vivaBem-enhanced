@@ -60,15 +60,25 @@ habilitado e a tabela `embedding_items` existe (Fase 7).
 - `GET /health` (liveness) e `GET /ready` (banco + migrações).
 - Shutdown gracioso em `SIGINT`/`SIGTERM`: para o servidor, checkpoint do WAL e
   fecha o banco.
+- Manutenção operacional no boot e a cada 24h: sessões expiradas, eventos de
+  outbox concluídos com mais de 30 dias, bloqueios de IP vencidos e embeddings
+  órfãos. Nunca remove dados de domínio do usuário.
 
 ## Segurança HTTP
 
-- Security headers em todas as respostas.
+- Security headers em todas as respostas:
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Permissions-Policy`, `Cross-Origin-Resource-Policy`,
+  `Cross-Origin-Opener-Policy` e `X-Permitted-Cross-Domain-Policies`.
+- CSP `default-src 'none'` nas respostas de API; `/api/docs` fica sem CSP para o
+  Swagger UI funcionar.
+- `Cache-Control: no-store` em respostas de API.
+- HSTS em produção (atrás de HTTPS).
 - CORS restrito a `APP_ORIGIN` com `credentials: true`.
 - Limite de corpo: 1 MB.
-- Cookies `HttpOnly`, `SameSite=Lax`, `Secure` em produção (Fase 1).
-- CSRF double-submit + validação de Origin (Fase 1).
-- Rate limit por IP e por e-mail/usuário (Fase 1).
+- Cookies `HttpOnly`, `SameSite=Lax`, `Secure` em produção.
+- CSRF double-submit + validação de Origin.
+- Rate limit por IP, por e-mail e limites próprios para importação/exportação.
 
 ## Eventos e IA (Fase 7)
 

@@ -324,3 +324,29 @@ maior do que o caso de uso pede.
 **Consequência:** não é possível manter vínculos com várias pessoas ao mesmo
 tempo; se isso for necessário, a unicidade precisa migrar para
 `(user_id, partner_id)` com uma nova regra de negócio.
+
+## ADR-033 — Manutenção apaga só dados operacionais
+
+**Decisão:** um job em processo roda no boot e a cada 24h e remove apenas
+sessões expiradas, eventos de outbox concluídos com mais de 30 dias, bloqueios
+de IP vencidos e embeddings cujo insight de origem não existe. Dados de domínio
+do usuário nunca são apagados. A migração `009_hardening.sql` adiciona um índice
+por `expires_at` e um índice parcial de limpeza do outbox.
+**Motivo:** sessões e eventos terminais crescem para sempre em uma instância
+SQLite única; sem limpeza, o banco e os índices degradam. Apagar dados de
+domínio violaria a regra de soft delete.
+**Consequência:** o job é best-effort: falha é logada e a próxima execução tenta
+de novo. A retenção de eventos é uma constante de código; se auditoria exigir
+mais, ela precisa ser configurável e documentada.
+
+## ADR-034 — Deploy em um comando com Compose e backup por `VACUUM INTO`
+
+**Decisão:** a raiz ganha `compose.yaml` com build, volumes de dados e backups,
+healthcheck, shutdown gracioso e segredos vindos do ambiente. O backup é feito
+por `VACUUM INTO` em um módulo compartilhado entre a CLI e os testes. O CI roda
+testes com cobertura, publica LCOV e builda a imagem.
+**Motivo:** o deploy manual dependia de uma sequência longa de comandos e o
+backup por cópia de arquivo é inconsistente com WAL ativo.
+**Consequência:** o host precisa de Docker Compose v2; o SQLite continua
+single-writer, então o deploy assume uma instância. Restore exige parar a stack
+e remover `-wal`/`-shm`.

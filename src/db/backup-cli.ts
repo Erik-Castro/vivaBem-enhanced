@@ -1,6 +1,6 @@
-import { dirname, join } from "node:path";
 import { ConfigError, loadConfig } from "../config.ts";
 import { createLogger } from "../shared/logger/index.ts";
+import { backupDatabase } from "./backup.ts";
 import { createDatabase } from "./client.ts";
 
 try {
@@ -18,11 +18,7 @@ try {
   });
 
   try {
-    const timestamp = new Date().toISOString().replaceAll(":", "-").replace(/\.\d{3}Z$/, "Z");
-    const target = join("backups", `app-${timestamp}.db`);
-
-    Deno.mkdirSync(dirname(target), { recursive: true });
-    db.raw.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
+    const target = backupDatabase(db);
 
     logger.info("database_backup_created", { source: config.databasePath, target });
   } finally {

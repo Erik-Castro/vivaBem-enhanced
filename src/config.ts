@@ -35,6 +35,8 @@ export interface AiConfig {
 export interface RateLimitConfig {
   /** Máximo de tentativas por janela nos endpoints de autenticação. */
   readonly authMax: number;
+  /** Máximo por janela em rotas pesadas (importação/exportação). */
+  readonly dataMax: number;
   /** Tamanho da janela deslizante em milissegundos. */
   readonly windowMs: number;
 }
@@ -110,6 +112,7 @@ const rawConfigSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   VECTOR_EXTENSION_PATH: optionalString,
   RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(10_000).default(5),
+  RATE_LIMIT_DATA_MAX: z.coerce.number().int().min(1).max(10_000).default(30),
   RATE_LIMIT_WINDOW: duration.default("1m"),
   AI_ENABLED: envBoolean(false),
   AI_PROVIDER: z.enum(AI_PROVIDERS).default("openai"),
@@ -215,6 +218,7 @@ export function loadConfig(
     vectorExtensionPath: raw.VECTOR_EXTENSION_PATH,
     rateLimit: {
       authMax: raw.RATE_LIMIT_AUTH_MAX,
+      dataMax: raw.RATE_LIMIT_DATA_MAX,
       windowMs: (parseDurationSeconds(raw.RATE_LIMIT_WINDOW) ?? 60) * 1_000,
     },
     ai: {

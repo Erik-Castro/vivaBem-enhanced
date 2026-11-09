@@ -5,6 +5,8 @@ uma reescrita greenfield, **API-first**, a partir do projeto legado em `referenc
 leitura).
 
 - **Plano completo:** [`docs/PLAN.md`](docs/PLAN.md)
+- **API:** [`docs/API.md`](docs/API.md) e `/api/docs`
+- **Deploy e operação:** [`docs/DEPLOY.md`](docs/DEPLOY.md)
 - **Guia de contribuição/agentes:** [`AGENTS.md`](AGENTS.md)
 - **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 
@@ -162,6 +164,8 @@ Todas as variáveis estão em [`.env.example`](.env.example). Destaques:
 | `DATABASE_PATH`         | `./data/app.db`         | Use `/app/data/app.db` no Docker             |
 | `APP_ORIGIN`            | `http://localhost:3000` | CORS/CSRF                                    |
 | `JWT_SECRET`            | —                       | **Obrigatório em produção** (32+ caracteres) |
+| `RATE_LIMIT_AUTH_MAX`   | `5`                     | Tentativas por minuto em autenticação        |
+| `RATE_LIMIT_DATA_MAX`   | `30`                    | Chamadas por minuto em import/export         |
 | `AI_ENABLED`            | `false`                 | IA é opt-in por usuário                      |
 | `AI_PROVIDER`           | `openai`                | `openai` (compatível) ou `ollama`            |
 | `VECTOR_EXTENSION_PATH` | —                       | Sobrescreve o binário do `sqlite-vector`     |
@@ -171,16 +175,38 @@ no log).
 
 ## Docker
 
+Deploy em um comando com Compose (build + volumes + healthcheck):
+
+```bash
+cp .env.example .env   # defina APP_ORIGIN e JWT_SECRET
+make deploy            # docker compose up -d --build
+curl -fsS http://127.0.0.1:3000/ready
+```
+
+Ou build manual:
+
 ```bash
 docker build --build-arg VERSION=$(grep -o '"version": *"[^"]*"' deno.json | cut -d'"' -f4) -t vivabem:local .
 docker run --rm -p 3000:3000 \
   -v vivabem-data:/app/data \
+  -v vivabem-backups:/app/backups \
   -e JWT_SECRET="$(openssl rand -base64 48)" \
   -e APP_ORIGIN="http://localhost:3000" \
   vivabem:local
 ```
 
-Detalhes de Portainer, backup e restore: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+Backup, restore, Portainer e checklist de produção: [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+## Checklist de produção
+
+- [ ] `ENV=production`, HTTPS e `COOKIE_SECURE=true`.
+- [ ] `JWT_SECRET` forte e fora do Git.
+- [ ] `APP_ORIGIN` igual à origem do frontend.
+- [ ] Volume `/app/data` persistente.
+- [ ] Backup diário agendado, copiado para fora do host e restore testado.
+- [ ] `/health` e `/ready` monitorados.
+- [ ] `AI_ENABLED=false` até o usuário autorizar.
+- [ ] Uma única instância (SQLite é single-writer).
 
 ## Estrutura
 
@@ -210,5 +236,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 ## Status
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
-6 (engajamento), 7 (eventos + IA) e 8 (dados e colaboração) concluídas — versão atual `0.9.0`.
-Próxima: Fase 9 (hardening e deploy). Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
+6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas —
+versão atual `0.10.0`. Próxima: Fase 10 (frontend Svelte 5 + Vite/PWA). Veja o roadmap em
+[`AGENTS.md`](AGENTS.md#16-roadmap).
