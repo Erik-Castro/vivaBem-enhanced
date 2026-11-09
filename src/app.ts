@@ -55,6 +55,14 @@ import { registerNotificationsRoutes } from "./modules/notifications/notificatio
 import { InsightsRepository } from "./modules/insights/insights.repository.ts";
 import { InsightsService } from "./modules/insights/insights.service.ts";
 import { registerInsightsRoutes } from "./modules/insights/insights.controller.ts";
+import { ImportService } from "./modules/import/import.service.ts";
+import { registerImportRoutes } from "./modules/import/import.controller.ts";
+import { ExportRepository } from "./modules/export/export.repository.ts";
+import { ExportService } from "./modules/export/export.service.ts";
+import { registerExportRoutes } from "./modules/export/export.controller.ts";
+import { FamilyRepository } from "./modules/family/family.repository.ts";
+import { FamilyService } from "./modules/family/family.service.ts";
+import { registerFamilyRoutes } from "./modules/family/family.controller.ts";
 import type { EmbeddingsService } from "./ai/embeddings.service.ts";
 import { evaluateAchievementsAfterMutation } from "./http/middleware/achievement-evaluation.ts";
 import { SlidingWindowRateLimiter } from "./shared/utils/rate-limiter.ts";
@@ -188,6 +196,19 @@ export function createApp({ db, config, logger, embeddings = null }: AppDependen
     embeddings,
   });
 
+  const importService = new ImportService({
+    db,
+    accounts: accountsRepository,
+    transactions: transactionsRepository,
+    events,
+  });
+
+  const exportRepository = new ExportRepository(db);
+  const exportService = new ExportService(exportRepository);
+
+  const familyRepository = new FamilyRepository(db);
+  const familyService = new FamilyService(familyRepository, notificationsRepository);
+
   const achievementsRepository = new AchievementsRepository(db);
   const achievementsService = new AchievementsService({
     db,
@@ -228,6 +249,12 @@ export function createApp({ db, config, logger, embeddings = null }: AppDependen
   app.use("/api/v1/notifications/*", requireAuth(repository, config));
   app.use("/api/v1/insights", requireAuth(repository, config));
   app.use("/api/v1/insights/*", requireAuth(repository, config));
+  app.use("/api/v1/import", requireAuth(repository, config));
+  app.use("/api/v1/import/*", requireAuth(repository, config));
+  app.use("/api/v1/export", requireAuth(repository, config));
+  app.use("/api/v1/export/*", requireAuth(repository, config));
+  app.use("/api/v1/family", requireAuth(repository, config));
+  app.use("/api/v1/family/*", requireAuth(repository, config));
 
   // Registrado depois dos guards: quando `next()` retorna, `userId` já existe.
   app.use("*", evaluateAchievementsAfterMutation(achievementsService, logger));
@@ -292,6 +319,9 @@ export function createApp({ db, config, logger, embeddings = null }: AppDependen
   registerAchievementsRoutes(app, { service: achievementsService, config });
   registerNotificationsRoutes(app, { service: notificationsService, config });
   registerInsightsRoutes(app, { service: insightsService, config });
+  registerImportRoutes(app, { service: importService, config });
+  registerExportRoutes(app, { service: exportService, config });
+  registerFamilyRoutes(app, { service: familyService, config });
 
   app.get("/api/docs", swaggerUI({ url: `/api/${API_VERSION}/openapi.json` }));
 

@@ -11,6 +11,7 @@ export const EVENT_TYPES = [
   "finance.transaction.deleted",
   "finance.transaction.cleared",
   "finance.transfer.created",
+  "finance.transaction.imported",
   "finance.budget.created",
   "finance.budget.updated",
   "finance.goal.contribution.created",

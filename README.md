@@ -97,6 +97,25 @@ Servidor em `http://localhost:3000`:
 | `GET /api/v1/notifications/unread-count`                 | Notificações não lidas             |
 | `PATCH /api/v1/notifications/:id/read`                   | Marca uma notificação como lida    |
 | `POST /api/v1/notifications/read-all`                    | Marca todas como lidas             |
+| `GET /api/v1/insights`                                   | Insights gerados pela IA           |
+| `GET /api/v1/insights/unread-count`                      | Insights não lidos                 |
+| `GET /api/v1/insights/search?q=`                         | Busca textual/vetorial de insights |
+| `PATCH /api/v1/insights/:id/read`                        | Marca um insight como lido         |
+| `POST /api/v1/insights/read-all`                         | Marca todos os insights como lidos |
+| `POST /api/v1/insights/:id/feedback`                     | Registra feedback do insight       |
+| `POST /api/v1/import/preview`                            | Prévia de import CSV/OFX           |
+| `POST /api/v1/import/commit`                             | Importa CSV/OFX com dedupe         |
+| `GET /api/v1/export?format=csv\|json`                    | Exporta os dados do usuário        |
+| `POST /api/v1/family/invite`                             | Convida um familiar                |
+| `GET /api/v1/family`                                     | Convites e vínculo ativo           |
+| `POST /api/v1/family/:id/accept`                         | Aceita um convite                  |
+| `POST /api/v1/family/:id/reject`                         | Recusa um convite                  |
+| `DELETE /api/v1/family/:id`                              | Encerra convite ou vínculo         |
+| `GET /api/v1/family/summary`                             | Resumo agregado do parceiro        |
+
+Importação usa `multipart/form-data` com os campos `accountId` e `file`; exportação aceita
+`format=csv` ou `format=json`. O resumo familiar expõe apenas totais e contagens do mês corrente,
+nunca transações individuais.
 
 O banco é criado em `./data/app.db` e as migrações rodam no boot.
 
@@ -191,5 +210,5 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 ## Status
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
-6 (engajamento) e 7 (eventos + IA) concluídas — versão atual `0.8.0`. Próxima: Fase 8 (dados e
-colaboração). Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
+6 (engajamento), 7 (eventos + IA) e 8 (dados e colaboração) concluídas — versão atual `0.9.0`.
+Próxima: Fase 9 (hardening e deploy). Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).

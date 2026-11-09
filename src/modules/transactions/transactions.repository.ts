@@ -181,6 +181,73 @@ export class TransactionsRepository {
       );
   }
 
+  /**
+   * Insere uma transação importada respeitando a unicidade de
+   * `(account_id, import_hash)`. Devolve `false` quando o banco descarta a
+   * linha por conflito, o que torna o commit idempotente mesmo com dois
+   * imports concorrentes do mesmo arquivo.
+   */
+  insertImported(record: CreateTransactionRecord): boolean {
+    const result = this.db
+      .prepare<
+        [
+          string,
+          string,
+          string | null,
+          string | null,
+          TransactionType,
+          number,
+          string,
+          string | null,
+          string,
+          number,
+          string | null,
+          string | null,
+          string,
+          string,
+          string | null,
+        ]
+      >(
+        `INSERT INTO transactions
+           (id, account_id, category_id, transfer_group_id, type, amount_minor,
+            currency_code, description, transaction_date, is_cleared, external_id,
+            import_hash, created_at, updated_at, recurring_transaction_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT DO NOTHING`,
+      )
+      .run(
+        record.id,
+        record.accountId,
+        record.categoryId,
+        record.transferGroupId,
+        record.type,
+        record.amountMinor,
+        record.currencyCode,
+        record.description,
+        record.transactionDate,
+        record.isCleared ? 1 : 0,
+        record.externalId,
+        record.importHash,
+        record.now,
+        record.now,
+        record.recurringTransactionId ?? null,
+      );
+
+    return result.changes > 0;
+  }
+
+  /** Hashes já gravados na conta, usados para marcar duplicados no preview. */
+  existingImportHashes(accountId: string): Set<string> {
+    const rows = this.db
+      .prepare<[string], { import_hash: string }>(
+        `SELECT import_hash FROM transactions
+         WHERE account_id = ? AND import_hash IS NOT NULL AND deleted_at IS NULL`,
+      )
+      .all(accountId);
+
+    return new Set(rows.map((row) => row.import_hash));
+  }
+
   insertInstallment(record: CreateInstallmentRecord): void {
     this.db
       .prepare<[string, string, number, number, string]>(

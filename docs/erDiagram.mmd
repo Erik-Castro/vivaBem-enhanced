@@ -76,11 +76,14 @@ erDiagram
         uuid account_id FK
         uuid category_id FK
         uuid transfer_group_id
+        uuid recurring_transaction_id FK
         string type
         numeric amount
         string description
         date transaction_date
         boolean is_cleared
+        string external_id
+        string import_hash
         datetime created_at
     }
 
@@ -306,6 +309,19 @@ erDiagram
     }
 
     %% ==========================
+    %% COLABORAÇÃO
+    %% ==========================
+
+    FAMILY_LINKS {
+        uuid id PK
+        uuid requester_id FK
+        uuid addressee_id FK
+        string status "pending, accepted, rejected, revoked"
+        datetime created_at
+        datetime responded_at
+    }
+
+    %% ==========================
     %% SISTEMA / INFRAESTRUTURA
     %% ==========================
 
@@ -378,4 +394,8 @@ erDiagram
     USER_PROFILES ||--o{ EMBEDDING_ITEMS : indexa
     USER_PROFILES ||--o| AI_CORRELATION_STATE : acompanha
     EVENT_OUTBOX ||--o{ AI_ACTION_LOGS : produz_auditoria
+
+    %% Relacionamentos de colaboração
+    USER_PROFILES ||--o{ FAMILY_LINKS : convida
+    USER_PROFILES ||--o{ FAMILY_LINKS : recebe_convite
     AI_INSIGHTS ||--o{ AI_FEEDBACK : recebe_feedback

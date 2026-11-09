@@ -212,8 +212,8 @@ src/
       004_habits.sql
       005_investments.sql
       006_engagement.sql
-      007_family.sql
-      008_ai.sql
+      007_ai.sql
+      008_data.sql
     repositories/
       users.ts
       sessions.ts
@@ -360,7 +360,7 @@ Makefile
 
 | Tabela | Colunas principais |
 |---|---|
-| `family_links` | `id`, `requester_id`, `addressee_id`, `status` (`pending`, `accepted`, `rejected`, `revoked`), `created_at`, `responded_at` (unique par ordenado) |
+| `family_links` | `id`, `requester_id`, `addressee_id`, `status` (`pending`, `accepted`, `rejected`, `revoked`), `created_at`, `responded_at` (par único sem ordem via `ux_family_links_pair`) |
 
 #### IA / EIE
 
@@ -393,6 +393,8 @@ Makefile
 - `user_sessions(refresh_token_hash)` (unique), `user_sessions(user_id, expires_at)`
 - `auth_events(email, created_at)`, `auth_events(ip_address, created_at)`
 - `family_links(requester_id)`, `family_links(addressee_id)`
+- `ux_family_links_pair` em `min(requester_id, addressee_id), max(requester_id, addressee_id)`
+- `ux_transactions_import_hash` em `(account_id, import_hash)` parcial, apenas linhas vivas com hash
 - `embedding_items(user_id, source_type, source_id)` (unique)
 
 ### 5.4 Correções em relação à referência
@@ -500,10 +502,14 @@ Códigos: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLIC
 | Investments | `GET/POST /investments`, `GET/PATCH/DELETE /investments/:id`, `GET/POST /investments/:id/transactions`, `GET/POST /investments/:id/quotes`, `GET /investments/portfolio`, `GET /investments/:id/performance` |
 | Achievements | `GET /achievements`, `GET /achievements/me`, `GET /achievements/me/progress` |
 | Notifications | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/:id/read`, `POST /notifications/read-all` |
-| Family | `POST /family/invite`, `POST /family/accept`, `GET /family/link`, `DELETE /family/link` |
+| Family | `POST /family/invite`, `GET /family`, `POST /family/:id/accept`, `POST /family/:id/reject`, `DELETE /family/:id`, `GET /family/summary` |
 | Insights | `GET /insights`, `GET /insights/unread-count`, `GET /insights/search?q=`, `PATCH /insights/:id/read`, `POST /insights/read-all`, `POST /insights/:id/feedback` |
-| Export | `GET /export?format=csv\|json` |
-| Import | `POST /import/preview`, `POST /import/commit` (CSV/OFX; Fase 8) |
+| Export | `GET /export?format=csv\|json` (Fase 8) |
+| Import | `POST /import/preview`, `POST /import/commit` (multipart CSV/OFX; Fase 8) |
+
+> Importação, exportação e família foram implementadas na `0.9.0` (Fase 8). A
+> importação usa `accountId` + `file` em `multipart/form-data`; o resumo
+> familiar é agregado e nunca expõe transações individuais do parceiro.
 
 ---
 
@@ -612,6 +618,9 @@ Worker (claim/lease)
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | 3–4 dias | CI verde; E2E; deploy one-command |
 
 **Total da API: ~31–43 dias.** Frontend Svelte 5 + Vite/PWA: ~15–20 dias (plano separado).
+
+Fases 0 a 8 concluídas e publicadas de `0.1.0` a `0.9.0`. A Fase 9 (hardening)
+é a próxima.
 
 ---
 
@@ -793,5 +802,5 @@ deno task release -- patch|minor|major
 
 ## 16. Próximo passo
 
-Iniciar a **Fase 8** (dados e colaboração): import CSV/OFX com dedupe, export
-completo e family links escopados.
+Iniciar a **Fase 9** (hardening): segurança, E2E, cobertura, índices, backups,
+documentação e deploy.

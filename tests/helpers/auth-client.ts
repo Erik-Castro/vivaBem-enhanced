@@ -44,6 +44,22 @@ export class AuthTestClient {
     this.#absorb(response);
   }
 
+  /**
+   * Envia `multipart/form-data` com cookies e CSRF do jar. O `content-type`
+   * (com boundary) é definido pelo próprio `FormData`.
+   */
+  async requestForm(path: string, form: FormData, method = "POST"): Promise<Response> {
+    const headers: Record<string, string> = {};
+
+    const cookie = cookieHeader(this.cookies);
+    if (cookie !== "") headers.cookie = cookie;
+    headers["x-csrf-token"] = this.csrfToken;
+
+    const response = await this.#app.request(path, { method, headers, body: form });
+    this.#absorb(response);
+    return response;
+  }
+
   async request(
     path: string,
     options: {

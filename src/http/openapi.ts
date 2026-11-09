@@ -117,6 +117,14 @@ export function registerOpenApiDocument(app: OpenAPIHono<AppEnv>, config: AppCon
         name: "Notifications",
         description: "Notificações do usuário, leitura e contagem",
       },
+      {
+        name: "Data",
+        description: "Importação CSV/OFX e exportação dos dados do usuário",
+      },
+      {
+        name: "Family",
+        description: "Convites, vínculo familiar e resumo agregado do parceiro",
+      },
     ],
   });
 }

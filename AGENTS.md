@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento) e 7 (eventos + IA) concluídas, versão `0.8.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA) e 8 (dados e colaboração) concluídas, versão `0.9.0`
 
 ---
 
@@ -44,7 +44,7 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`) e 7 (`0.8.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`) e 8 (`0.9.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -71,6 +71,9 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/modules/achievements/` | catálogo, DSL de critérios, progresso e desbloqueio |
 | `src/modules/notifications/` | notificações escopadas, leitura e contagem |
 | `src/modules/insights/` | insights da IA, leitura, contagem, busca e feedback |
+| `src/modules/import/` | parsers CSV/OFX, preview, dedupe e commit idempotente |
+| `src/modules/export/` | bundle JSON completo e CSV de transações |
+| `src/modules/family/` | convites, vínculo familiar e resumo agregado do parceiro |
 | `src/modules/security/` | repositório de bloqueio de IP acionado pelas tools |
 | `src/shared/utils/date.ts` | datas de negócio, soma de meses com clamp, intervalos e dia ISO |
 | `src/db/client.ts` | conexão SQLite + extensão vetorial + transações |
@@ -82,9 +85,10 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/db/migrations/005_investments.sql` | ativos, operações e cotações |
 | `src/db/migrations/006_engagement.sql` | conquistas, progresso e notificações |
 | `src/db/migrations/007_ai.sql` | outbox, logs de IA, insights, feedback, embeddings e blocklist |
+| `src/db/migrations/008_data.sql` | vínculos familiares e unicidade de `import_hash` |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
 | `src/main.ts` | bootstrap: config → migrações → seed → catch-up → runtime de IA → servidor |
-| `tests/` | unitários e integração com SQLite real (185 testes) |
+| `tests/` | unitários e integração com SQLite real (206 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
@@ -160,7 +164,8 @@ src/
   db/                  # client, migrate, migrations, repositories
   modules/             # auth, users, accounts, categories, transactions,
                        # recurring, budgets, goals, habits, investments,
-                       # achievements, notifications, family, insights, export
+                       # achievements, notifications, family, insights,
+                       # import, export
   events/              # publisher (outbox) + worker
   ai/                  # providers, context, prompts, tools, registry,
                        # executor, embeddings, correlation
@@ -294,6 +299,31 @@ src/modules/<dominio>/
 - A correlação cross-domain (`habit_spending_link`, `weekend_spending_peak`) é
   calculada em SQL e só agenda `correlation.check` após
   `AI_CORRELATION_THRESHOLD` eventos concluídos desde a última execução.
+
+### 5.9 Dados e colaboração (Fase 8)
+
+- A importação aceita `multipart/form-data` com `accountId` e `file`, detecta
+  CSV ou OFX pelo conteúdo (nunca pela extensão) e limita a 1 MB e 5.000 linhas.
+- O `import_hash` é `sha256` de `external|accountId|FITID` quando há `FITID`;
+  sem ele, de `content|accountId|data|tipo|valor|descrição normalizada`. A conta
+  entra na chave para impedir dedupe entre contas diferentes.
+- `transactions.import_hash` tem unicidade parcial por conta entre linhas vivas;
+  o commit usa `ON CONFLICT DO NOTHING`, então reimportar o mesmo arquivo é
+  idempotente mesmo com concorrência.
+- O preview devolve no máximo 500 linhas, mas os totais e os erros por linha
+  cobrem o arquivo inteiro; erros não interrompem as linhas válidas.
+- O commit grava as transações e publica `finance.transaction.imported` no
+  outbox dentro da mesma transação, com totais e até 200 IDs de amostra.
+- O export JSON devolve todas as entidades do usuário em camelCase; o CSV
+  exporta transações vivas com nome da conta e da categoria. Hashes de senha e
+  refresh token e vetores de embedding nunca entram no bundle.
+- Um usuário só pode ter um vínculo familiar pendente ou ativo por vez. O par é
+  único sem ordem (`ux_family_links_pair`); recusar/revogar e convidar de novo
+  reabre a mesma linha.
+- O resumo familiar expõe apenas totais do mês corrente por moeda e contagens
+  agregadas do parceiro; nunca transações, contas ou categorias individuais.
+- Convite, aceite, recusa e revogação geram notificação para o outro lado;
+  qualquer acesso cruzado a um vínculo retorna `NOT_FOUND`.
 
 ---
 
@@ -452,6 +482,7 @@ Regras:
 - Sexta release: `0.6.0` (2026-11-05), publicada ao concluir a Fase 5.
 - Sétima release: `0.7.0` (2026-11-05), publicada ao concluir a Fase 6.
 - Oitava release: `0.8.0` (2026-11-05), publicada ao concluir a Fase 7.
+- Nona release: `0.9.0` (2026-11-09), publicada ao concluir a Fase 8.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -557,8 +588,8 @@ deno test --coverage
 | 5 | Investimentos: ativos, operações, posições, performance | ✅ `0.6.0` |
 | 6 | Engajamento: catálogo + DSL de critérios, notificações | ✅ `0.7.0` |
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ✅ `0.8.0` |
-| 8 | Dados e colaboração: import CSV/OFX, export, family links | ⏳ próximo |
-| 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ⬜ |
+| 8 | Dados e colaboração: import CSV/OFX, export, family links | ✅ `0.9.0` |
+| 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ⏳ próximo |
 | 10 | Frontend Svelte 5 + Vite/PWA | ⬜ |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
@@ -595,6 +626,9 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/modules/achievements/` | Catálogo, DSL de critérios, progresso e desbloqueio |
 | `src/modules/notifications/` | Notificações escopadas, leitura e contagem |
 | `src/modules/insights/` | Insights da IA, leitura, contagem, busca e feedback |
+| `src/modules/import/` | Parsers CSV/OFX, preview, dedupe e commit idempotente |
+| `src/modules/export/` | Bundle JSON completo e CSV de transações |
+| `src/modules/family/` | Convites, vínculo familiar e resumo agregado do parceiro |
 | `src/modules/security/` | Bloqueio de IP acionado pelas tools |
 | `src/events/event-publisher.ts` | Publicação no outbox (opt-in e IA ligada) |
 | `src/events/worker.ts` | Claim, lease, backoff, dead-letter e correlação |

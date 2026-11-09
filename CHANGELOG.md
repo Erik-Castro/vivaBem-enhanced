@@ -11,6 +11,55 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 - Nada ainda.
 
+## [0.9.0] - 2026-11-09
+
+Nona release: dados e colaboração (Fase 8).
+
+### Added
+
+- Migração `008_data.sql` com `family_links`, índices por solicitante e
+  destinatário, unicidade do par não ordenado (`ux_family_links_pair`) e
+  unicidade parcial de `transactions.import_hash` por conta entre transações
+  vivas (`ux_transactions_import_hash`).
+- Importação de extratos CSV e OFX em `POST /api/v1/import/preview` e
+  `POST /api/v1/import/commit`, via `multipart/form-data` (`accountId` +
+  `file`), com detecção de formato pelo conteúdo.
+- Parser de CSV com separador `,` ou `;`, campos citados, valores em pt-BR ou
+  internacional e cabeçalhos em português ou inglês; parser de OFX 1.x (SGML) e
+  2.x (XML) por `STMTTRN`, com `FITID`, `DTPOSTED`, `TRNAMT` e `MEMO`.
+- Deduplicação automática por `import_hash`: `FITID` quando presente; caso
+  contrário, data + tipo + valor + descrição normalizada, sempre incluindo a
+  conta. O preview marca linhas duplicadas e o commit é idempotente mesmo com
+  importações concorrentes.
+- Limites de importação de 1 MB e 5.000 linhas, com erros por linha sem
+  interromper o arquivo; o preview devolve no máximo 500 linhas e os totais
+  completos.
+- Exportação em `GET /api/v1/export?format=json|csv`: JSON com todas as
+  entidades do usuário em camelCase e CSV de transações não removidas com nome
+  da conta e da categoria. Hashes de senha/refresh token e vetores de embedding
+  ficam fora do bundle.
+- Vínculos familiares em `POST /api/v1/family/invite`, `GET /api/v1/family`,
+  `POST /api/v1/family/{id}/accept`, `POST /api/v1/family/{id}/reject` e
+  `DELETE /api/v1/family/{id}`, com notificações para o outro lado.
+- `GET /api/v1/family/summary` com apenas totais agregados do parceiro no mês
+  corrente por moeda (receita, despesa, transferências, líquido e contagem) e
+  contagens de contas, hábitos, logs, metas e conquistas; nenhuma transação,
+  conta ou categoria individual é exposta.
+- Evento `finance.transaction.imported` publicado no outbox dentro da transação
+  do commit, com totais da importação e amostra limitada de IDs.
+- Testes de parsers CSV/OFX, importação idempotente, exportação e vínculos
+  familiares (206 testes no total).
+
+### Changed
+
+- `transactions` aceita `import_hash` com unicidade parcial por conta; linhas
+  importadas usam `ON CONFLICT DO NOTHING`, preservando a idempotência.
+- `src/app.ts` monta os módulos de importação, exportação e família; as rotas
+  exigem autenticação.
+- O OpenAPI ganhou as tags `Data` e `Family`.
+- Recusar ou revogar um vínculo e convidar de novo reabre a mesma linha em vez
+  de acumular histórico duplicado.
+
 ## [0.8.0] - 2026-11-05
 
 Oitava release: eventos + IA (Fase 7).

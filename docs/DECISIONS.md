@@ -271,3 +271,56 @@ execução mesmo quando não encontra padrão.
 ruído; o LLM deve apenas resumir números já calculados.
 **Consequência:** a correlação é eventual e por volume, não em tempo real; um
 usuário com pouco movimento pode demorar a receber o primeiro insight.
+
+## ADR-029 — Dedupe de importação por hash escopado na conta
+
+**Decisão:** cada linha importada recebe um `import_hash` SHA-256. Quando o
+arquivo traz `FITID`, a chave é `external|accountId|FITID`; sem ele, é
+`content|accountId|data|tipo|valor|descrição normalizada`. A conta sempre entra
+na chave e `transactions.import_hash` tem unicidade parcial por conta entre
+linhas vivas.
+**Motivo:** o `FITID` é a identidade oficial do OFX, mas arquivos CSV nem sempre
+trazem um; o fallback por conteúdo mantém a importação útil. Incluir a conta
+evita que o mesmo extrato em duas contas seja tratado como duplicado.
+**Consequência:** duas linhas legitimamente idênticas no mesmo arquivo/Conta
+(dois cafés no mesmo dia e valor) são deduplicadas; o usuário pode lançar a
+segunda manualmente. Reimportar o mesmo arquivo não cria nada.
+
+## ADR-030 — Preview e commit com o mesmo parser e commit idempotente
+
+**Decisão:** `POST /import/preview` e `POST /import/commit` compartilham o mesmo
+parser e a mesma função de hash. O commit grava com
+`INSERT ... ON CONFLICT DO NOTHING`, dentro de uma transação, e publica
+`finance.transaction.imported` no outbox na mesma transação.
+**Motivo:** duplicar a lógica de parsing faria o preview divergir do commit; o
+`ON CONFLICT` garante idempotência mesmo se dois commits concorrentes passarem
+pela checagem prévia.
+**Consequência:** o commit pode reportar `skipped` maior que o preview; o
+preview limita a 500 linhas por resposta, mas os totais sempre cobrem o arquivo
+inteiro.
+
+## ADR-031 — Exportação com JSON completo e CSV de transações
+
+**Decisão:** `GET /export?format=json` devolve todas as entidades do usuário em
+camelCase; `format=csv` exporta apenas transações vivas com nome da conta e da
+categoria. Hashes de senha/refresh token e vetores de embedding nunca são
+incluídos.
+**Motivo:** JSON é o formato de portabilidade e backup; CSV é o formato que
+planilhas e outros apps de finanças consomem. Segredos não pertencem ao bundle
+do usuário.
+**Consequência:** o JSON pode ser grande para usuários antigos; uma futura
+exportação parcial exige novo parâmetro, não mudança no formato padrão.
+
+## ADR-032 — Vínculo familiar como par único e resumo agregado
+
+**Decisão:** `family_links` guarda um único registro por par não ordenado
+(`ux_family_links_pair`) e um usuário só pode ter um vínculo pendente ou ativo
+por vez. Recusar ou revogar e convidar de novo reabre a mesma linha. O resumo
+do parceiro expõe apenas totais do mês corrente por moeda e contagens
+agregadas.
+**Motivo:** histórico duplicado de convites não agrega valor e complica a
+listagem; compartilhar transações individuais seria uma exposição de dados
+maior do que o caso de uso pede.
+**Consequência:** não é possível manter vínculos com várias pessoas ao mesmo
+tempo; se isso for necessário, a unicidade precisa migrar para
+`(user_id, partner_id)` com uma nova regra de negócio.
