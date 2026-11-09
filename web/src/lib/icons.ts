@@ -47,6 +47,7 @@ export const iconPaths = {
   ],
   search: ["M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15Z", "m21 21-4.5-4.5"],
   chevronDown: ["m6 9 6 6 6-6"],
+  chevronLeft: ["m15 6-6 6 6 6"],
   chevronRight: ["m9 6 6 6-6 6"],
   edit: ["M16.5 3.75a2.12 2.12 0 0 1 3 3L7.5 18.75l-4.5 1.5 1.5-4.5L16.5 3.75Z"],
   trash: [

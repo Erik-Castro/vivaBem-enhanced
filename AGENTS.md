@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP e as telas de orçamentos e metas entregues
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP e as telas de orçamentos, metas e hábitos entregues
 
 ---
 
@@ -196,8 +196,8 @@ web/
     lib/                # api, auth, router, theme, toast, format, types
     components/         # AppShell, modais, linha de transação
     pages/              # login, register, dashboard, accounts, transactions,
-                        # categories, budgets, goals, settings, coming-soon,
-                        # not-found
+                        # categories, budgets, goals, habits, settings,
+                        # coming-soon, not-found
 docs/
   PLAN.md API.md ARCHITECTURE.md DECISIONS.md DEPLOY.md FRONTEND.md
 ```
@@ -678,7 +678,7 @@ deno test --coverage
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ✅ `0.8.0` |
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ✅ `0.9.0` |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ✅ `0.10.0` |
-| 10 | Frontend Svelte 5 + Vite/PWA | 🚧 MVP + orçamentos e metas entregues (auth, painel, contas, transações, categorias, orçamentos, metas, PWA, deploy) |
+| 10 | Frontend Svelte 5 + Vite/PWA | 🚧 MVP + orçamentos, metas e hábitos entregues (auth, painel, contas, transações, categorias, orçamentos, metas, hábitos, PWA, deploy) |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 
@@ -700,6 +700,10 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `web/src/pages/Goals.svelte` | Abas por status, progresso, pausa, cancelamento e contribuições |
 | `web/src/components/GoalFormModal.svelte` | Criação/edição de metas (moeda travada após contribuições) |
 | `web/src/components/GoalDetailModal.svelte` | Progresso e histórico de contribuições |
+| `web/src/pages/Habits.svelte` | Abas de hábitos e gatilhos, check-in e sequências |
+| `web/src/components/HabitFormModal.svelte` | Criação/edição de hábitos (tipo, frequência, dias e pai) |
+| `web/src/components/HabitDetailModal.svelte` | Streak, calendário mensal e registros |
+| `web/src/components/TriggerFormModal.svelte` | Criação/edição de gatilhos de substituição |
 | `web/src/components/BudgetFormModal.svelte` | Criação/edição de orçamentos |
 | `web/src/components/TransactionFormModal.svelte` | Criação/edição de transações e transferências |
 | `web/src/app.css` | Design system, tema e responsividade |

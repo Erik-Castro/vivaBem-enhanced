@@ -11,6 +11,7 @@
   import ComingSoon from "./pages/ComingSoon.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
   import Goals from "./pages/Goals.svelte";
+  import Habits from "./pages/Habits.svelte";
   import Login from "./pages/Login.svelte";
   import NotFound from "./pages/NotFound.svelte";
   import Register from "./pages/Register.svelte";
@@ -20,12 +21,6 @@
   const publicRoutes = new Set(["/login", "/register"]);
 
   const comingSoon: Record<string, { title: string; description: string; icon: IconName }> = {
-    "/habits": {
-      title: "Hábitos",
-      description:
-        "Construa rotinas boas, acompanhe sequências e conecte hábitos a gatilhos do dia a dia.",
-      icon: "heart",
-    },
     "/investments": {
       title: "Investimentos",
       description:
@@ -84,6 +79,8 @@
       <Budgets />
     {:else if router.path === "/goals"}
       <Goals />
+    {:else if router.path === "/habits"}
+      <Habits />
     {:else if router.path === "/settings"}
       <Settings />
     {:else if soon}

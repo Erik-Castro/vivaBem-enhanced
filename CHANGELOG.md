@@ -22,8 +22,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Tela de metas com abas por status, progresso por meta, criação, edição,
   pausa/retomada, cancelamento (`DELETE` apenas cancela) e um detalhe com
   histórico de contribuições (adicionar e remover).
+- Tela de hábitos com abas de hábitos e gatilhos, check-in diário, sequência
+  atual/recorde, calendário mensal, registro/remoção de logs e criação,
+  edição, desativação e reativação de hábitos e gatilhos de substituição.
 - Navegação mobile com cinco atalhos fixos e menu "Mais" em bottom sheet para
-  categorias, configurações e telas ainda em "em breve".
+  categorias, hábitos, configurações e telas ainda em "em breve".
 - Tema claro/escuro com design tokens em CSS próprio, layout responsivo com
   sidebar e navegação inferior, e toast de feedback.
 - PWA com manifest, ícones PNG/SVG (`192`, `512`, maskable e apple-touch) e

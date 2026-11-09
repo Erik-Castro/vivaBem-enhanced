@@ -1,5 +1,13 @@
 import type { IconName } from "./icons";
-import type { AccountType, CategoryNode, CategoryType, TransactionType } from "./types";
+import type {
+  AccountType,
+  CategoryNode,
+  CategoryType,
+  Habit,
+  HabitFrequencyType,
+  HabitType,
+  TransactionType,
+} from "./types";
 
 export const accountTypeOptions: readonly {
   readonly value: AccountType;
@@ -134,4 +142,60 @@ export function descendantIds(
   }
 
   return result;
+}
+
+export const habitTypeOptions: readonly {
+  readonly value: HabitType;
+  readonly label: string;
+}[] = [
+  { value: "good", label: "Hábito bom" },
+  { value: "bad", label: "Hábito ruim" },
+];
+
+export const habitFrequencyOptions: readonly {
+  readonly value: HabitFrequencyType;
+  readonly label: string;
+}[] = [
+  { value: "daily", label: "Diário" },
+  { value: "weekly", label: "Semanal" },
+  { value: "custom", label: "Personalizado" },
+];
+
+export const weekdayOptions: readonly {
+  readonly value: number;
+  readonly short: string;
+  readonly label: string;
+}[] = [
+  { value: 1, short: "Seg", label: "Segunda-feira" },
+  { value: 2, short: "Ter", label: "Terça-feira" },
+  { value: 3, short: "Qua", label: "Quarta-feira" },
+  { value: 4, short: "Qui", label: "Quinta-feira" },
+  { value: 5, short: "Sex", label: "Sexta-feira" },
+  { value: 6, short: "Sáb", label: "Sábado" },
+  { value: 7, short: "Dom", label: "Domingo" },
+];
+
+export function habitTypeLabel(type: HabitType): string {
+  return habitTypeOptions.find((option) => option.value === type)?.label ?? type;
+}
+
+export function habitFrequencyLabel(type: HabitFrequencyType): string {
+  return habitFrequencyOptions.find((option) => option.value === type)?.label ?? type;
+}
+
+/** Resumo legível da agenda: "Diário" ou "Seg, Qua e Sex". */
+export function habitScheduleLabel(habit: Pick<Habit, "frequencyType" | "daysOfWeek">): string {
+  if (habit.frequencyType === "daily") return "Diário";
+
+  const days = weekdayOptions
+    .filter((option) => habit.daysOfWeek.includes(option.value))
+    .map((option) => option.short);
+
+  return days.length === 0 ? "Sem dias definidos" : days.join(", ");
+}
+
+/** Frequência já com os dias: "Diário" ou "Personalizado · Seg, Qua, Sex". */
+export function habitRecurrenceLabel(habit: Pick<Habit, "frequencyType" | "daysOfWeek">): string {
+  if (habit.frequencyType === "daily") return "Diário";
+  return `${habitFrequencyLabel(habit.frequencyType)} · ${habitScheduleLabel(habit)}`;
 }

@@ -192,6 +192,79 @@ export interface GoalProgress {
   readonly lastContributionDate: string | null;
 }
 
+export type HabitType = "good" | "bad";
+export type HabitFrequencyType = "daily" | "weekly" | "custom";
+
+export interface Habit {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly color: string | null;
+  readonly habitType: HabitType;
+  readonly frequencyType: HabitFrequencyType;
+  readonly daysOfWeek: readonly number[];
+  readonly dailyTarget: number;
+  readonly targetUnit: string | null;
+  readonly orderIndex: number;
+  readonly parentHabitId: string | null;
+  readonly isActive: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface HabitLog {
+  readonly id: string;
+  readonly habitId: string;
+  readonly logDate: string;
+  readonly value: number;
+  readonly note: string | null;
+  readonly triggerId: string | null;
+  readonly replacementUsed: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface HabitTrigger {
+  readonly id: string;
+  readonly badHabitId: string;
+  readonly badHabitName: string;
+  readonly replacementHabitId: string | null;
+  readonly replacementHabitName: string | null;
+  readonly triggerDescription: string;
+  readonly alternativeAction: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface HabitStreak {
+  readonly habitId: string;
+  readonly currentStreak: number;
+  readonly longestStreak: number;
+  readonly lastCompletedDate: string | null;
+  readonly scheduledToday: boolean;
+  readonly completedToday: boolean;
+}
+
+export type HabitDayStatus = "completed" | "missed" | "not_scheduled" | "pending";
+
+export interface HabitCalendarDay {
+  readonly date: string;
+  readonly scheduled: boolean;
+  readonly completed: boolean;
+  readonly status: HabitDayStatus;
+  readonly value: number | null;
+  readonly note: string | null;
+  readonly triggerId: string | null;
+  readonly replacementUsed: boolean;
+}
+
+export interface HabitCalendar {
+  readonly habitId: string;
+  readonly from: string;
+  readonly to: string;
+  readonly days: readonly HabitCalendarDay[];
+}
+
 export interface Session {
   readonly id: string;
   readonly ipAddress: string | null;
