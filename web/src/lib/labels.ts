@@ -1,6 +1,7 @@
 import type { IconName } from "./icons";
 import type {
   AccountType,
+  AchievementCategory,
   CategoryNode,
   CategoryType,
   Habit,
@@ -226,3 +227,28 @@ export const assetClassSuggestions: readonly string[] = [
   "Previdência",
   "Outros",
 ];
+
+export const achievementCategoryOptions: readonly {
+  readonly value: AchievementCategory;
+  readonly label: string;
+  readonly icon: IconName;
+}[] = [
+  { value: "finance", label: "Finanças", icon: "wallet" },
+  { value: "habit", label: "Hábitos", icon: "heart" },
+  { value: "investment", label: "Investimentos", icon: "piggy" },
+  { value: "system", label: "Sistema", icon: "sparkles" },
+];
+
+export function achievementCategoryLabel(category: AchievementCategory): string {
+  return (
+    achievementCategoryOptions.find((option) => option.value === category)?.label ??
+    category
+  );
+}
+
+export function achievementCategoryIcon(category: AchievementCategory): IconName {
+  return (
+    achievementCategoryOptions.find((option) => option.value === category)?.icon ??
+    "trophy"
+  );
+}

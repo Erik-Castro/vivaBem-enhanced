@@ -101,7 +101,7 @@ web/
     components/         # AppShell, modais, linha de transação, toasts
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
                         # Categories, Budgets, Goals, Habits, Investments,
-                        # Settings, ComingSoon, NotFound
+                        # Achievements, Settings, ComingSoon, NotFound
 ```
 
 ### 4.1 Rotas
@@ -118,8 +118,8 @@ web/
 | `#/goals` | sim | Metas por status, progresso e contribuições |
 | `#/habits` | sim | Hábitos, check-in, streaks, calendário e gatilhos |
 | `#/investments` | sim | Carteira, posições, ativos, operações e cotações |
+| `#/achievements` | sim | Catálogo, progresso, pontos, abas por status e busca |
 | `#/settings` | sim | Perfil, preferências, sessões e sair |
-| `#/achievements` | sim | Placeholder "em breve" |
 | qualquer outra | sim | Página não encontrada |
 
 Rotas públicas redirecionam usuários autenticados para o painel; rotas
@@ -240,5 +240,5 @@ frontend e, em HTTP local, `COOKIE_SECURE=false`.
   renderizadas no servidor nem indexáveis.
 - Sem cache offline de dados, fila de mutações ou sincronização em segundo plano.
 - Lista de transações usa paginação por `limit`/`offset`, sem virtualização.
-- Ainda não há tela de conquistas; a rota existe com placeholder.
+
 - Sem testes de unidade de componentes (apenas typecheck e build no CI).

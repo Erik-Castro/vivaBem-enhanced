@@ -348,3 +348,29 @@ export interface Session {
   readonly expiresAt: string;
   readonly current: boolean;
 }
+
+export type AchievementCategory = "finance" | "habit" | "investment" | "system";
+
+export interface Achievement {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly category: AchievementCategory;
+  readonly pointsReward: number;
+  readonly badgeIconUrl: string | null;
+  readonly targetMetric: number;
+  readonly isHidden: boolean;
+  readonly createdAt: string;
+}
+
+export interface AchievementProgress extends Achievement {
+  readonly currentProgress: number;
+  readonly isUnlocked: boolean;
+  readonly unlockedAt: string | null;
+}
+
+export interface AchievementSummary {
+  readonly unlocked: number;
+  readonly total: number;
+  readonly points: number;
+}

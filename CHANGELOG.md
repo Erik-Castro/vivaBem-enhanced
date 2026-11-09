@@ -29,8 +29,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   edição de ativos (moeda travada após a primeira operação), registro de
   compras, vendas, dividendos e taxas, cotações, remoção com soft delete e
   detalhe com custo médio, valor de mercado e resultado.
+- Tela de conquistas com catálogo público filtrado (sem regras/parâmetros),
+  progresso do usuário, resumo com pontos e percentual de coleção, abas por
+  status, filtro por categoria e busca; ocultas só aparecem se desbloqueadas.
 - Navegação mobile com cinco atalhos fixos e menu "Mais" em bottom sheet para
-  categorias, hábitos, investimentos, configurações e telas ainda em "em breve".
+  categorias, hábitos, investimentos, conquistas, configurações.
 - Tema claro/escuro com design tokens em CSS próprio, layout responsivo com
   sidebar e navegação inferior, e toast de feedback.
 - PWA com manifest, ícones PNG/SVG (`192`, `512`, maskable e apple-touch) e

@@ -13,6 +13,7 @@
   import Goals from "./pages/Goals.svelte";
   import Habits from "./pages/Habits.svelte";
   import Investments from "./pages/Investments.svelte";
+  import Achievements from "./pages/Achievements.svelte";
   import Login from "./pages/Login.svelte";
   import NotFound from "./pages/NotFound.svelte";
   import Register from "./pages/Register.svelte";
@@ -22,12 +23,6 @@
   const publicRoutes = new Set(["/login", "/register"]);
 
   const comingSoon: Record<string, { title: string; description: string; icon: IconName }> = {
-    "/achievements": {
-      title: "Conquistas",
-      description:
-        "Celebre marcos de consistência e bons hábitos financeiros ao longo do caminho.",
-      icon: "trophy",
-    },
   };
 
   const isPublic = $derived(publicRoutes.has(router.path));
@@ -78,6 +73,8 @@
       <Habits />
     {:else if router.path === "/investments"}
       <Investments />
+    {:else if router.path === "/achievements"}
+      <Achievements />
     {:else if router.path === "/settings"}
       <Settings />
     {:else if soon}
