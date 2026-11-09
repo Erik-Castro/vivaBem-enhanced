@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP entregue
 
 ---
 
@@ -19,7 +19,8 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 - 95+ avaliadores de conquistas bespoke → agora DSL declarativa;
 - sem OpenAPI/versionamento → agora `/api/v1` + OpenAPI 3.1.
 
-**Estratégia:** API primeiro. O frontend (Svelte 5 + Vite/PWA) será feito depois da API.
+**Estratégia:** API primeiro. O frontend (Svelte 5 + Vite/PWA) fica em `web/` e
+consome a API em `/api/v1` pela mesma origem; o MVP está entregue.
 
 ---
 
@@ -36,7 +37,9 @@ Viva Bem é um app de finanças pessoais + construção de hábitos, com anális
 | Auth | Argon2id + access JWT em cookie HttpOnly + refresh opaco rotativo |
 | Logs | logger JSON próprio |
 | Testes | `Deno.test` + `@std/assert` + `@std/testing/time` |
-| Deploy | Docker multi-stage + Portainer |
+| Frontend | Svelte 5 (runes) + Vite 7 + TypeScript strict + PWA |
+| Estilo do frontend | CSS próprio com design tokens; sem Tailwind nem lib de componentes |
+| Deploy | Docker multi-stage + Nginx + Portainer |
 
 **Não adicione dependências sem justificar.** Prefira a biblioteca padrão do Deno e `fetch` nativo.
 
@@ -88,12 +91,20 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/db/migrations/008_data.sql` | vínculos familiares e unicidade de `import_hash` |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
 | `src/main.ts` | bootstrap: config → migrações → seed → catch-up → runtime de IA → servidor |
-| `tests/` | unitários e integração com SQLite real (206 testes) |
+| `tests/` | unitários e integração com SQLite real (216 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
+| `web/` | SPA Svelte 5 + Vite + PWA: shell, páginas, componentes, `lib/` e assets PWA |
+| `web/src/lib/api.ts` | cliente HTTP com cookies, CSRF, refresh single-flight e tradução de erros |
+| `web/src/lib/auth.svelte.ts` | store de sessão (init, login, register, logout) |
+| `web/src/lib/router.svelte.ts` | hash router reativo |
+| `web/src/app.css` | design tokens, layout, tema e responsividade |
+| `web/nginx.conf` | fallback do SPA, proxy `/api`, CSP, cache e `/healthz` |
+| `web/Dockerfile` | build Node 24 + runtime Nginx não-root (porta 8080) |
 | `docs/erDiagram.mmd` | ERD de referência para o novo schema |
 | `docs/PLAN.md` | plano completo aprovado |
+| `docs/FRONTEND.md` | arquitetura, rotas, auth, PWA e deploy do frontend |
 | `CHANGELOG.md` | Keep a Changelog, com `[Unreleased]` e releases |
-| Docker/CI | `Dockerfile`, `.dockerignore`, `.github/workflows/ci.yml` |
+| Docker/CI | `Dockerfile`, `web/Dockerfile`, `compose.yaml`, `.github/workflows/ci.yml` |
 
 **Permissões do Deno:** `better-sqlite3` é um addon nativo e exige `--allow-ffi`; ele também consulta `process.report`/CPUs e exige `--allow-sys`. As tasks do `deno.json` já encapsulam as permissões necessárias. Nunca use `--allow-all`.
 
@@ -116,6 +127,11 @@ deno task db:migrate     # aplica migrações pendentes
 deno task db:reset       # apaga e recria o banco
 deno task db:backup      # backup em backups/
 deno task check:release  # valida versão x CHANGELOG
+
+make web-install         # npm ci em web/
+make web-dev             # Vite em http://localhost:5173 (proxy para :3000)
+make web-check           # svelte-check (0 erros e 0 warnings)
+make web-build           # build de produção + PWA em web/dist
 ```
 
 ### 4.2 Alvo para as próximas fases
@@ -172,8 +188,17 @@ src/
   shared/              # crypto, logger, utils
 tests/
   helpers/ unit/ integration/ e2e/
+web/
+  index.html vite.config.ts nginx.conf Dockerfile
+  public/              # ícones e assets do PWA
+  src/
+    App.svelte main.ts app.css
+    lib/                # api, auth, router, theme, toast, format, types
+    components/         # AppShell, modais, linha de transação
+    pages/              # login, register, dashboard, accounts, transactions,
+                        # categories, settings, coming-soon, not-found
 docs/
-  PLAN.md API.md ARCHITECTURE.md DECISIONS.md DEPLOY.md
+  PLAN.md API.md ARCHITECTURE.md DECISIONS.md DEPLOY.md FRONTEND.md
 ```
 
 ### 5.3 Módulo padrão
@@ -347,6 +372,27 @@ src/modules/<dominio>/
   healthcheck, shutdown gracioso e deploy em um comando; o CI publica cobertura
   LCOV.
 
+### 5.11 Frontend (Fase 10)
+
+- O SPA vive em `web/`: Svelte 5 com runes, Vite 7, TypeScript strict e PWA
+  (`vite-plugin-pwa`/Workbox). Detalhes em `docs/FRONTEND.md`.
+- Rotas usam hash (`#/dashboard`, ...) para hospedagem estática; `App.svelte`
+  aplica guards (público x autenticado) e `router.svelte.ts` normaliza o hash.
+- Cookies são a única credencial: o cliente (`lib/api.ts`) usa
+  `credentials: "include"`, faz bootstrap de CSRF em `GET /auth/csrf`, envia
+  `X-CSRF-Token` em métodos mutáveis e renova a sessão uma única vez em `401`.
+- Dinheiro nunca vira `float` no cliente: `amountMinor` é formatado com
+  `Intl.NumberFormat` e a entrada é convertida por `toMinorUnits`.
+- Estilo é CSS próprio com tokens (`app.css`), tema claro/escuro em
+  `data-theme` e persistência em `localStorage`. Não introduza Tailwind nem
+  biblioteca de componentes sem aprovação.
+- O container é Nginx não-root na porta 8080, com fallback do SPA, proxy de
+  `/api`, `/health` e `/ready`, CSP e cache de assets; `sw.js` não é cacheado.
+- `vite` está fixado em 7.x de propósito: o Vite 8/Rolldown usa instruções
+  indisponíveis em CPUs AVX-only e quebra o build. Não atualize sem testar.
+- `npm run check` deve ficar em 0 erros e 0 warnings; `npm run build` deve gerar
+  `sw.js` e o manifest.
+
 ---
 
 ## 6. Convenções de código
@@ -365,6 +411,12 @@ src/modules/<dominio>/
 - Validação: Zod na borda; tipos inferidos dos schemas.
 - SQL: apenas prepared statements; nunca interpole entrada de usuário.
 - Comentários: explique **por quê**, não **o quê**.
+- Frontend: Svelte 5 com runes (sem stores legadas); estado global só para
+  sessão, rota, tema e toasts. Tipos espelham o contrato da API em `lib/types.ts`.
+- Frontend: nunca leia tokens (são HttpOnly) nem monte URL absoluta da API; use
+  `lib/api.ts` e caminhos relativos (`/transactions`, não `/api/v1/transactions`).
+- Frontend: dinheiro em `amountMinor`; formatação e conversão só via
+  `lib/format.ts`.
 
 ---
 
@@ -531,6 +583,9 @@ Regras:
 - **IA:** provider fake determinístico; outbox, worker, retry, dead-letter, executor, context, embeddings.
 - **E2E:** servidor em porta aleatória; register → login → conta → transação → resumo → logout.
 - **Tempo:** `@std/testing/time` para recorrência, streak e DST.
+- **Frontend:** `npm run check` (svelte-check, 0 erros e 0 warnings) e
+  `npm run build` (Vite + PWA) no CI; validação de navegador é manual com
+  Playwright/Chromium e cobre o fluxo de registro, finanças e transferência.
 - **Nunca mocke o banco**; use SQLite real em diretório temporário.
 - Cada teste deve ser isolado: DB própria, sem estado compartilhado.
 - Testes de ordem não devem depender de outros testes.
@@ -573,6 +628,10 @@ deno test --coverage
 - ❌ Bumpar versão sem atualizar o changelog.
 - ❌ Adicionar dependência sem justificativa.
 - ❌ Alterar migração já aplicada.
+- ❌ Adicionar Tailwind, biblioteca de componentes ou fonte externa no frontend.
+- ❌ Guardar access/refresh token em `localStorage` ou em memória no frontend.
+- ❌ Cachear respostas de `/api/**` no service worker.
+- ❌ Subir Vite 8/Rolldown: quebra o build em CPUs AVX-only.
 
 ---
 
@@ -582,7 +641,8 @@ deno test --coverage
 2. Verifique a fase atual e o Definition of Done.
 3. Inspecione o código existente antes de editar.
 4. Faça mudanças pequenas e coesas; preserve o estilo.
-5. Rode `deno fmt`, `deno lint`, `deno check` e `deno test`.
+5. Rode `deno fmt`, `deno lint`, `deno check` e `deno test`; no frontend,
+   `npm run check` e `npm run build` (em `web/`).
 6. Atualize OpenAPI, `CHANGELOG.md` e docs quando aplicável.
 7. Se a tarefa exigir uma decisão de arquitetura não documentada, **pare e pergunte**.
 8. Commit com Conventional Commits.
@@ -590,6 +650,7 @@ deno test --coverage
 ### Definition of Done (por fase)
 
 - `deno fmt --check`, `deno lint`, `deno check`, `deno test` verdes.
+- `npm run check` (0 erros e 0 warnings) e `npm run build` verdes em `web/`.
 - OpenAPI atualizado e válido.
 - `CHANGELOG.md` atualizado em `[Unreleased]`.
 - Migrações testadas (aplicar duas vezes sem erro).
@@ -613,7 +674,7 @@ deno test --coverage
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ✅ `0.8.0` |
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ✅ `0.9.0` |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ✅ `0.10.0` |
-| 10 | Frontend Svelte 5 + Vite/PWA | ⬜ |
+| 10 | Frontend Svelte 5 + Vite/PWA | 🚧 MVP entregue (auth, painel, contas, transações, categorias, PWA, deploy) |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 
@@ -625,6 +686,17 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 |---|---|
 | `docs/PLAN.md` | Plano completo aprovado |
 | `docs/erDiagram.mmd` | ERD de referência |
+| `docs/FRONTEND.md` | Arquitetura, rotas, auth, PWA e deploy do frontend |
+| `web/src/App.svelte` | Guards de rota e composição das páginas |
+| `web/src/lib/api.ts` | Cliente HTTP, CSRF, refresh e erros |
+| `web/src/lib/auth.svelte.ts` | Store de sessão |
+| `web/src/lib/router.svelte.ts` | Hash router |
+| `web/src/pages/Transactions.svelte` | Lista, filtros e ações de transações |
+| `web/src/components/TransactionFormModal.svelte` | Criação/edição de transações e transferências |
+| `web/src/app.css` | Design system, tema e responsividade |
+| `web/nginx.conf` | SPA fallback, proxy da API, CSP e cache |
+| `web/Dockerfile` | Build do SPA + runtime Nginx não-root |
+| `compose.yaml` | API + frontend com volumes, healthchecks e rede |
 | `CHANGELOG.md` | Histórico de mudanças (Keep a Changelog) |
 | `deno.json` | Runtime, imports, tasks, versão (SemVer) |
 | `src/config.ts` | Configuração validada com Zod |

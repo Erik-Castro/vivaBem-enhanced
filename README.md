@@ -6,6 +6,7 @@ leitura).
 
 - **Plano completo:** [`docs/PLAN.md`](docs/PLAN.md)
 - **API:** [`docs/API.md`](docs/API.md) e `/api/docs`
+- **Frontend:** [`docs/FRONTEND.md`](docs/FRONTEND.md) — SPA em `web/`
 - **Deploy e operação:** [`docs/DEPLOY.md`](docs/DEPLOY.md)
 - **Guia de contribuição/agentes:** [`AGENTS.md`](AGENTS.md)
 - **Changelog:** [`CHANGELOG.md`](CHANGELOG.md)
@@ -20,10 +21,13 @@ leitura).
 | Banco             | SQLite (`better-sqlite3`) + `sqlite-vector`        |
 | Auth              | Argon2id + access JWT em cookie + refresh rotativo |
 | Testes            | `Deno.test` + `@std/assert`                        |
+| Frontend          | Svelte 5 + Vite 7 + TypeScript + PWA               |
+| Deploy            | Docker multi-stage + Compose (API + Nginx)         |
 
 ## Requisitos
 
 - Deno **2.9.8** ou superior
+- Node **20.19+** ou **22.12+** (apenas para o frontend em `web/`)
 - Docker (opcional, para deploy)
 
 `better-sqlite3` é um addon nativo: as tasks já incluem `--allow-ffi` e `--allow-sys`.
@@ -121,6 +125,28 @@ nunca transações individuais.
 
 O banco é criado em `./data/app.db` e as migrações rodam no boot.
 
+## Frontend
+
+O SPA fica em `web/` (Svelte 5 + Vite + PWA) e consome a API pela mesma origem.
+
+```bash
+cd web && npm ci
+make web-dev          # Vite em http://localhost:5173
+```
+
+Com a API rodando em `:3000`, use `APP_ORIGIN=http://localhost:5173` — a API exige que a origem do
+navegador seja exatamente essa. Também existem:
+
+```bash
+make web-check        # svelte-check
+make web-build        # build de produção em web/dist
+cd web && npm run preview   # build em http://localhost:4173 (APP_ORIGIN igual)
+```
+
+Telas entregues: login/cadastro, painel, contas, transações (com transferência) e categorias, além
+de configurações (perfil, preferências, sessões e tema). Orçamentos, metas, hábitos, investimentos e
+conquistas ainda são placeholders. Detalhes: [`docs/FRONTEND.md`](docs/FRONTEND.md).
+
 ## Autenticação
 
 O fluxo é baseado em cookies, sem tokens no corpo da resposta:
@@ -149,6 +175,11 @@ deno task db:migrate     # migrações
 deno task db:reset       # apaga e recria o banco
 deno task db:backup      # backup em backups/
 deno task check:release  # valida versão x changelog
+
+make web-install         # npm ci no frontend
+make web-dev             # Vite em http://localhost:5173
+make web-check           # svelte-check
+make web-build           # build de produção em web/dist
 ```
 
 Ou use o `Makefile`: `make help`.
@@ -162,7 +193,8 @@ Todas as variáveis estão em [`.env.example`](.env.example). Destaques:
 | `PORT`                  | `3000`                  |                                              |
 | `ENV`                   | `development`           | `development`, `test`, `production`          |
 | `DATABASE_PATH`         | `./data/app.db`         | Use `/app/data/app.db` no Docker             |
-| `APP_ORIGIN`            | `http://localhost:3000` | CORS/CSRF                                    |
+| `APP_ORIGIN`            | `http://localhost:3000` | Origem exata do frontend (CORS/CSRF)         |
+| `WEB_PORT`              | `8080`                  | Porta publicada do container web no Compose  |
 | `JWT_SECRET`            | —                       | **Obrigatório em produção** (32+ caracteres) |
 | `RATE_LIMIT_AUTH_MAX`   | `5`                     | Tentativas por minuto em autenticação        |
 | `RATE_LIMIT_DATA_MAX`   | `30`                    | Chamadas por minuto em import/export         |
@@ -175,15 +207,20 @@ no log).
 
 ## Docker
 
-Deploy em um comando com Compose (build + volumes + healthcheck):
+Deploy em um comando com Compose (build da API + frontend, volumes e healthcheck):
 
 ```bash
-cp .env.example .env   # defina APP_ORIGIN e JWT_SECRET
+cp .env.example .env   # defina APP_ORIGIN, JWT_SECRET e, em HTTP local, COOKIE_SECURE=false
 make deploy            # docker compose up -d --build
 curl -fsS http://127.0.0.1:3000/ready
 ```
 
-Ou build manual:
+- API: `http://localhost:3000` (health em `/health`)
+- Frontend: `http://localhost:8080` (Nginx não-root, proxy para a API)
+
+Em produção troque `APP_ORIGIN` pela URL HTTPS pública do frontend e mantenha `COOKIE_SECURE=true`.
+
+Build manual da API:
 
 ```bash
 docker build --build-arg VERSION=$(grep -o '"version": *"[^"]*"' deno.json | cut -d'"' -f4) -t vivabem:local .
@@ -193,6 +230,13 @@ docker run --rm -p 3000:3000 \
   -e JWT_SECRET="$(openssl rand -base64 48)" \
   -e APP_ORIGIN="http://localhost:3000" \
   vivabem:local
+```
+
+Build manual do frontend (o Nginx procura a API no host `vivabem`; use Compose para a rede correta):
+
+```bash
+docker build -t vivabem-web:local ./web
+docker run --rm -p 8080:8080 vivabem-web:local
 ```
 
 Backup, restore, Portainer e checklist de produção: [`docs/DEPLOY.md`](docs/DEPLOY.md).
@@ -207,6 +251,7 @@ Backup, restore, Portainer e checklist de produção: [`docs/DEPLOY.md`](docs/DE
 - [ ] `/health` e `/ready` monitorados.
 - [ ] `AI_ENABLED=false` até o usuário autorizar.
 - [ ] Uma única instância (SQLite é single-writer).
+- [ ] Frontend em HTTPS na mesma origem da API (proxy `/api` do Nginx).
 
 ## Estrutura
 
@@ -224,6 +269,7 @@ src/
   shared/          # logger, crypto, utils
 tests/             # unit, integration, e2e
 bin/sqlite-vector/ # fallback do binário da extensão vetorial
+web/               # SPA Svelte 5 + Vite + PWA (Nginx no Compose)
 ```
 
 ## Versionamento
@@ -237,5 +283,6 @@ bin/sqlite-vector/ # fallback do binário da extensão vetorial
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas —
-versão atual `0.10.0`. Próxima: Fase 10 (frontend Svelte 5 + Vite/PWA). Veja o roadmap em
-[`AGENTS.md`](AGENTS.md#16-roadmap).
+versão atual `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP entregue
+(autenticação, painel, contas, transações e categorias); orçamentos, metas, hábitos, investimentos e
+conquistas ainda são placeholders. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).

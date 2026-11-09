@@ -616,11 +616,15 @@ Worker (claim/lease)
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools/executor, insights, embeddings, correlação | 5–7 dias | zero latência na API; eventos não perdidos; JSON inválido gera retry |
 | 8 | Dados e colaboração: import CSV/OFX com dedupe, export, family links | 3–4 dias | import com preview/erros; export completo; acesso familiar escopado |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | 3–4 dias | CI verde; E2E; deploy one-command |
+| 10 | Frontend Svelte 5 + Vite/PWA: fundação, auth, painel, contas, transações/categorias, PWA e deploy | 5–7 dias (MVP) | `svelte-check` e build verdes; fluxo completo no navegador; um comando de deploy |
 
-**Total da API: ~31–43 dias.** Frontend Svelte 5 + Vite/PWA: ~15–20 dias (plano separado).
+**Total da API: ~31–43 dias.** Frontend completo: ~15–20 dias; o MVP da Fase 10
+cobre fundação, autenticação, painel e finanças.
 
-Fases 0 a 9 concluídas e publicadas de `0.1.0` a `0.10.0`. A próxima é a Fase 10
-(frontend Svelte 5 + Vite/PWA).
+Fases 0 a 9 concluídas e publicadas de `0.1.0` a `0.10.0`. A Fase 10 está em
+andamento: o MVP (fundação, autenticação, painel, contas, transações,
+categorias, PWA e deploy) foi entregue; as telas de orçamentos, metas, hábitos,
+investimentos e conquistas ainda são placeholders.
 
 ---
 
@@ -774,6 +778,7 @@ Fases 0 a 9 concluídas e publicadas de `0.1.0` a `0.10.0`. A próxima é a Fase
 | `AI_CORRELATION_THRESHOLD` | `50` | Eventos para correlação |
 | `AI_OLLAMA_URL` | `http://localhost:11434` | Adapter Ollama (opcional) |
 | `AI_MODEL` | — | Modelo Ollama (opcional) |
+| `WEB_PORT` | `8080` | Porta publicada do container web no Compose |
 
 ### 15.2 Comandos previstos
 
@@ -789,6 +794,11 @@ deno task db:seed        # dados demo
 deno task db:reset       # apaga e recria
 deno task db:backup      # backup
 deno task release -- patch|minor|major
+
+make web-install         # npm ci no frontend
+make web-dev             # Vite em http://localhost:5173
+make web-check           # svelte-check
+make web-build           # build de produção em web/dist
 ```
 
 ### 15.3 Primeira release
@@ -802,5 +812,40 @@ deno task release -- patch|minor|major
 
 ## 16. Próximo passo
 
-Iniciar a **Fase 10** (frontend Svelte 5 + Vite/PWA). A API está congelada em
-`/api/v1`; mudanças de contrato exigem `/api/v2` + release MAJOR.
+Concluir a **Fase 10** (frontend Svelte 5 + Vite/PWA): implementar as telas de
+orçamentos, metas, hábitos, investimentos e conquistas sobre o MVP já entregue.
+A API está congelada em `/api/v1`; mudanças de contrato exigem `/api/v2` +
+release MAJOR.
+
+---
+
+## 17. Fase 10 — detalhamento
+
+Detalhes de arquitetura, rotas e operação: [`FRONTEND.md`](FRONTEND.md).
+
+### 17.1 Entregue (MVP)
+
+- `web/` com Svelte 5 (runes) + Vite 7 + TypeScript strict + PWA.
+- Hash routing (`#/dashboard`, `#/login`, ...), guards de rota e página 404.
+- Cliente HTTP com cookies, bootstrap de CSRF, refresh *single-flight* em 401 e
+  tradução de erros da API.
+- Telas: login, cadastro, painel (resumo do mês, saldos e últimas transações),
+  contas (com cartão, saldo e ativação), transações (filtros, paginação, criar,
+  editar, remover, compensar e transferir) e categorias (árvore e
+  subcategorias), além de configurações (perfil, preferências, sessões, sair).
+- Tema claro/escuro com tokens, layout responsivo (sidebar + navegação inferior)
+  e toasts.
+- PWA com manifest, ícones PNG/SVG e precache do shell; API nunca é cacheada.
+- Container Nginx não-root na porta 8080, proxy de `/api`, `/health` e `/ready`,
+  CSP e cache headers; serviço `web` no Compose e alvos `make web-*`.
+- CI com job de frontend (`npm ci`, `svelte-check`, build) e build da imagem.
+
+### 17.2 Pendente
+
+- Telas de orçamentos, metas, hábitos, investimentos e conquistas.
+- Notificações e insights da IA na interface.
+- Importação/exportação e vínculo familiar na interface.
+- Testes de componentes e E2E de UI no CI.
+- Fila offline/sincronização em segundo plano (hoje o app abre offline, mas
+  mutações falham com mensagem).
+

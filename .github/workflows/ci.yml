@@ -47,6 +47,30 @@ jobs:
           path: coverage.lcov
           if-no-files-found: error
 
+  web:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Typecheck (svelte-check)
+        run: npm run check
+
+      - name: Build (Vite + PWA)
+        run: npm run build
+
   docker:
     name: Imagem Docker
     runs-on: ubuntu-latest
@@ -54,5 +78,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build
+      - name: Build da API
         run: docker build -t vivabem:ci .
+
+      - name: Build do frontend
+        run: docker build -t vivabem-web:ci ./web

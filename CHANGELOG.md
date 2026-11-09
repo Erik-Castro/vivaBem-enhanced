@@ -9,7 +9,42 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
-- Nada ainda.
+- Frontend SPA em `web/` com Svelte 5 (runes), Vite 7, TypeScript strict e PWA:
+  hash routing, guards de rota, cliente HTTP com cookies, bootstrap de CSRF,
+  refresh *single-flight* e tradução de erros da API.
+- Telas de login/cadastro, painel do mês, contas (cartão, saldo e ativação),
+  transações (filtros, paginação, criação, edição, remoção, compensação e
+  transferência entre contas), categorias (árvore e subcategorias) e
+  configurações (perfil, preferências, sessões e sair).
+- Tema claro/escuro com design tokens em CSS próprio, layout responsivo com
+  sidebar e navegação inferior, e toast de feedback.
+- PWA com manifest, ícones PNG/SVG (`192`, `512`, maskable e apple-touch) e
+  precache do app shell; chamadas de API nunca são cacheadas.
+- Serviço `web` no `compose.yaml` (Nginx não-root na porta `${WEB_PORT:-8080}`,
+  dependente da API saudável) e `web/Dockerfile` multi-stage.
+- `web/nginx.conf` com fallback do SPA, proxy de `/api`, `/health` e `/ready`,
+  CSP, headers de segurança, cache de assets e `sw.js` sem cache.
+- Job `Frontend` no CI (`npm ci`, `svelte-check`, build) e build da imagem do
+  frontend junto do job Docker.
+- `docs/FRONTEND.md` com arquitetura, rotas, fluxo de auth, PWA, URLs de
+  desenvolvimento e limitações.
+
+### Changed
+
+- `APP_ORIGIN` do `.env.example` passa a apontar para o frontend
+  (`http://localhost:5173`) e `COOKIE_SECURE` no Compose é configurável
+  (`${COOKIE_SECURE:-true}`), permitindo HTTP local.
+- `Makefile` ganha `web-install`, `web-dev`, `web-check` e `web-build`.
+- `README.md`, `docs/PLAN.md` e `docs/DEPLOY.md` documentam o frontend e o
+  deploy com API + Nginx.
+
+### Security
+
+- O container do frontend roda como usuário não-root e aplica CSP restritiva
+  (`script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`) e
+  `X-Frame-Options: DENY`.
+- Nenhum token é exposto ao JavaScript: o frontend usa apenas os cookies
+  HttpOnly `vb_access`/`vb_refresh` e o `vb_csrf` para double-submit.
 
 ## [0.10.0] - 2026-11-09
 

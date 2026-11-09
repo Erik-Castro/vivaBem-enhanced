@@ -2,7 +2,7 @@ DENO ?= deno
 IMAGE ?= vivabem
 TAG ?= $(shell grep -o '"version": *"[^"]*"' deno.json | head -1 | sed 's/.*"\([^"]*\)"$$/\1/')
 
-.PHONY: help install dev start test check lint fmt migrate reset backup seed clean docker-build docker-run deploy up down logs
+.PHONY: help install dev start test check lint fmt migrate reset backup seed clean docker-build docker-run deploy up down logs web-install web-dev web-build web-check
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -42,6 +42,18 @@ seed: ## Dados de demonstração (a partir da Fase 2)
 
 clean: ## Remove artefatos locais (não remove o banco)
 	rm -rf coverage build
+
+web-install: ## Instala dependências do frontend
+	cd web && npm ci
+
+web-dev: ## Sobe o frontend com Vite (proxy para a API em :3000)
+	cd web && npm run dev
+
+web-build: ## Gera o build de produção do frontend
+	cd web && npm run build
+
+web-check: ## Typecheck do frontend (svelte-check)
+	cd web && npm run check
 
 docker-build: ## Builda a imagem Docker
 	docker build --build-arg VERSION=$(TAG) -t $(IMAGE):$(TAG) .

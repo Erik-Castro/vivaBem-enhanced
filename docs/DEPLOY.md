@@ -8,32 +8,39 @@
 
 ## Deploy em um comando (Compose)
 
-O `compose.yaml` na raiz builda a imagem, cria os volumes e configura o
-healthcheck. Ele exige `APP_ORIGIN` e `JWT_SECRET`.
+O `compose.yaml` na raiz builda as duas imagens (API e frontend), cria os
+volumes e configura os healthchecks. Ele exige `APP_ORIGIN` e `JWT_SECRET`.
 
 ```bash
 cp .env.example .env
 # Edite pelo menos APP_ORIGIN e JWT_SECRET (mínimo 32 caracteres).
 # Gere um segredo forte com: openssl rand -base64 48
+# Em HTTP local use APP_ORIGIN=http://localhost:8080 e COOKIE_SECURE=false.
 
 make deploy        # equivale a: docker compose up -d --build
 make logs          # acompanha os logs
 curl -fsS http://127.0.0.1:3000/health
 curl -fsS http://127.0.0.1:3000/ready
+curl -fsS http://127.0.0.1:8080/healthz   # frontend
 ```
+
+O frontend fica em `http://localhost:${WEB_PORT:-8080}` e encaminha `/api`,
+`/health` e `/ready` para o serviço `vivabem:3000` na rede do Compose.
 
 Para parar sem perder dados: `make down` (os volumes `vivabem-data` e
 `vivabem-backups` permanecem).
 
 ### O que o Compose garante
 
-- Processo não-root (`appuser`, uid 10001) e imagem multi-stage.
+- API e frontend não-root (`appuser` uid 10001 / `nginx` uid 101), com imagens
+  multi-stage.
 - Volume nomeado `/app/data` para SQLite, WAL e SHM.
 - Volume `/app/backups` para snapshots gerados por `deno task db:backup`.
 - `ENV=production`, `COOKIE_SECURE=true`, `AI_ENABLED=false` por padrão.
 - Reinício automático, `stop_grace_period` de 30s e healthcheck em `/health`.
 - Shutdown gracioso em `SIGINT`/`SIGTERM`: servidor, checkpoint do WAL e banco
   fechado.
+- Nginx servindo o SPA com fallback, CSP, cache de assets e `sw.js` sem cache.
 
 ## Build manual
 
@@ -53,6 +60,16 @@ docker run -d --name vivabem \
   vivabem:"$VERSION"
 ```
 
+Frontend (Nginx não-root, porta 8080):
+
+```bash
+docker build -t vivabem-web:"$VERSION" ./web
+```
+
+O `web/nginx.conf` resolve a API pelo nome `vivabem:3000`, então publique o
+frontend na mesma rede do Compose (ou ajuste o `proxy_pass`). A origem pública
+do frontend precisa ser igual a `APP_ORIGIN` da API.
+
 ## Portainer
 
 1. **Stacks → Add stack**.
@@ -69,6 +86,7 @@ docker run -d --name vivabem \
 | `JWT_SECRET` | sim em produção | Mínimo 32 caracteres; rotate com cuidado |
 | `DATABASE_PATH` | não | Padrão `/app/data/app.db` na imagem |
 | `COOKIE_SECURE` | não | Use `true` atrás de HTTPS |
+| `WEB_PORT` | não | Porta publicada do frontend no Compose (padrão 8080) |
 | `RATE_LIMIT_AUTH_MAX` | não | Padrão 5/min por IP e por e-mail |
 | `RATE_LIMIT_DATA_MAX` | não | Padrão 30/min para import/export |
 | `AI_ENABLED` | não | Padrão `false`; opt-in por usuário |
@@ -146,6 +164,8 @@ barata.
 - [ ] `AI_ENABLED=false` até o usuário autorizar; chaves de IA só no ambiente.
 - [ ] Rate limits revisados para o tráfego esperado.
 - [ ] Uma única instância (SQLite é single-writer).
+- [ ] Frontend servido por HTTPS e `APP_ORIGIN` igual à URL pública.
+- [ ] `WEB_PORT` publicado apenas onde o proxy reverso alcança.
 
 ## Limites conhecidos
 
@@ -154,3 +174,5 @@ barata.
   o shutdown força checkpoint.
 - Sem conversão cambial: resumos não somam moedas diferentes.
 - O rate limiter é em memória; reiniciar o processo zera as janelas.
+- O service worker não faz cache de dados nem fila de mutações: offline, o app
+  abre mas ações de escrita falham com mensagem de erro.

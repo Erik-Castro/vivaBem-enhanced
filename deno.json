@@ -41,11 +41,12 @@
       "data",
       "coverage",
       "node_modules",
+      "web",
       "AGENTS.md",
       "CHANGELOG.md"
     ]
   },
   "lint": {
-    "exclude": ["reference_only", "build", "data", "coverage", "node_modules"]
+    "exclude": ["reference_only", "build", "data", "coverage", "node_modules", "web"]
   }
 }
