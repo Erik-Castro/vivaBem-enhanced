@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP e as telas de orçamentos, metas e hábitos entregues
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP e as telas de orçamentos, metas, hábitos e investimentos entregues
 
 ---
 
@@ -678,7 +678,7 @@ deno test --coverage
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ✅ `0.8.0` |
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ✅ `0.9.0` |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ✅ `0.10.0` |
-| 10 | Frontend Svelte 5 + Vite/PWA | 🚧 MVP + orçamentos, metas e hábitos entregues (auth, painel, contas, transações, categorias, orçamentos, metas, hábitos, PWA, deploy) |
+| 10 | Frontend Svelte 5 + Vite/PWA | 🚧 MVP + orçamentos, metas, hábitos e investimentos entregues (auth, painel, contas, transações, categorias, orçamentos, metas, hábitos, investimentos, PWA, deploy) |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 
@@ -704,6 +704,9 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `web/src/components/HabitFormModal.svelte` | Criação/edição de hábitos (tipo, frequência, dias e pai) |
 | `web/src/components/HabitDetailModal.svelte` | Streak, calendário mensal e registros |
 | `web/src/components/TriggerFormModal.svelte` | Criação/edição de gatilhos de substituição |
+| `web/src/pages/Investments.svelte` | Carteira, posições e ativos |
+| `web/src/components/InvestmentFormModal.svelte` | Criação/edição de ativos (moeda travada) |
+| `web/src/components/InvestmentDetailModal.svelte` | Performance, operações e cotações |
 | `web/src/components/BudgetFormModal.svelte` | Criação/edição de orçamentos |
 | `web/src/components/TransactionFormModal.svelte` | Criação/edição de transações e transferências |
 | `web/src/app.css` | Design system, tema e responsividade |

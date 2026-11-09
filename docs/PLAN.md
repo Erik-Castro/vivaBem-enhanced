@@ -623,8 +623,8 @@ cobre fundação, autenticação, painel e finanças.
 
 Fases 0 a 9 concluídas e publicadas de `0.1.0` a `0.10.0`. A Fase 10 está em
 andamento: o MVP (fundação, autenticação, painel, contas, transações,
-categorias, PWA e deploy) e as telas de orçamentos, metas e hábitos foram
-entregues; as telas de investimentos e conquistas ainda são placeholders.
+categorias, PWA e deploy) e as telas de orçamentos, metas, hábitos e
+investimentos foram entregues; a tela de conquistas ainda é um placeholder.
 
 ---
 
@@ -833,8 +833,9 @@ Detalhes de arquitetura, rotas e operação: [`FRONTEND.md`](FRONTEND.md).
   contas (com cartão, saldo e ativação), transações (filtros, paginação, criar,
   editar, remover, compensar e transferir), categorias (árvore e subcategorias),
   orçamentos (mês de referência, progresso e ativação), metas (abas por status,
-  progresso, pausa/retomada, cancelamento e contribuições) e hábitos (check-in,
-  sequências, calendário, registros e gatilhos), além de configurações (perfil,
+  progresso, pausa/retomada, cancelamento e contribuições), hábitos (check-in,
+  sequências, calendário, registros e gatilhos) e investimentos (carteira,
+  ativos, operações, cotações e performance), além de configurações (perfil,
   preferências, sessões, sair).
 - Navegação mobile com cinco atalhos fixos e menu "Mais" em bottom sheet.
 - Tema claro/escuro com tokens, layout responsivo (sidebar + navegação inferior)
@@ -846,7 +847,7 @@ Detalhes de arquitetura, rotas e operação: [`FRONTEND.md`](FRONTEND.md).
 
 ### 17.2 Pendente
 
-- Telas de investimentos e conquistas.
+- Tela de conquistas.
 - Notificações e insights da IA na interface.
 - Importação/exportação e vínculo familiar na interface.
 - Testes de componentes e E2E de UI no CI.

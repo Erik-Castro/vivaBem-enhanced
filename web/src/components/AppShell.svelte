@@ -26,11 +26,11 @@
     { path: "/budgets", label: "Orçamentos", icon: "chart" },
     { path: "/goals", label: "Metas", icon: "target" },
     { path: "/habits", label: "Hábitos", icon: "heart" },
+    { path: "/investments", label: "Investimentos", icon: "piggy" },
     { path: "/settings", label: "Configurações", icon: "sliders" },
   ];
 
   const comingSoonNav: NavItem[] = [
-    { path: "/investments", label: "Investimentos", icon: "piggy" },
     { path: "/achievements", label: "Conquistas", icon: "trophy" },
   ];
 

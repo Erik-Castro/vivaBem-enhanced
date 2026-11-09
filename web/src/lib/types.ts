@@ -265,6 +265,80 @@ export interface HabitCalendar {
   readonly days: readonly HabitCalendarDay[];
 }
 
+export type InvestmentOperationType = "buy" | "sell" | "dividend" | "fee";
+
+export interface Investment {
+  readonly id: string;
+  readonly ticker: string;
+  readonly name: string;
+  readonly assetClass: string;
+  readonly currencyCode: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface InvestmentTransaction {
+  readonly id: string;
+  readonly investmentId: string;
+  readonly accountId: string;
+  readonly accountName: string;
+  readonly operationType: InvestmentOperationType;
+  readonly quantity: number;
+  readonly unitPriceMinor: number;
+  readonly feesMinor: number;
+  readonly operationDate: string;
+  readonly createdAt: string;
+}
+
+export interface InvestmentQuote {
+  readonly id: string;
+  readonly investmentId: string;
+  readonly priceMinor: number;
+  readonly quotedAt: string;
+  readonly source: string | null;
+  readonly createdAt: string;
+}
+
+export interface InvestmentPosition {
+  readonly investmentId: string;
+  readonly ticker: string;
+  readonly name: string;
+  readonly assetClass: string;
+  readonly currencyCode: string;
+  readonly quantity: number;
+  readonly investedMinor: number;
+  readonly proceedsMinor: number;
+  readonly costBasisMinor: number;
+  readonly averageCostMinor: number;
+  readonly currentPriceMinor: number | null;
+  readonly marketValueMinor: number | null;
+  readonly unrealizedPnlMinor: number | null;
+  readonly realizedPnlMinor: number;
+  readonly dividendsMinor: number;
+  readonly feesMinor: number;
+  readonly totalPnlMinor: number;
+  readonly returnPercent: number;
+  readonly operationCount: number;
+  readonly firstOperationDate: string | null;
+  readonly lastOperationDate: string | null;
+  readonly quoteQuotedAt: string | null;
+}
+
+export interface PortfolioTotal {
+  readonly currencyCode: string;
+  readonly investmentCount: number;
+  readonly pricedCount: number;
+  readonly investedMinor: number;
+  readonly costBasisMinor: number;
+  readonly marketValueMinor: number;
+  readonly unrealizedPnlMinor: number;
+  readonly realizedPnlMinor: number;
+  readonly dividendsMinor: number;
+  readonly feesMinor: number;
+  readonly totalPnlMinor: number;
+  readonly valuationComplete: boolean;
+}
+
 export interface Session {
   readonly id: string;
   readonly ipAddress: string | null;

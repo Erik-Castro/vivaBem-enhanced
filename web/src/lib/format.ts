@@ -126,6 +126,16 @@ export function monthLabel(date = new Date(), locale = "pt-BR"): string {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+/** Quantidade de ativos: até 8 casas, sem zeros à direita. */
+export function formatQuantity(value: number): string {
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 8 }).format(value);
+}
+
+/** Percentual já formatado em pt-BR, incluindo o sinal quando negativo. */
+export function formatPercent(value: number): string {
+  return `${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(value)}%`;
+}
+
 export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }

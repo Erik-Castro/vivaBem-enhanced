@@ -6,6 +6,7 @@ import type {
   Habit,
   HabitFrequencyType,
   HabitType,
+  InvestmentOperationType,
   TransactionType,
 } from "./types";
 
@@ -199,3 +200,29 @@ export function habitRecurrenceLabel(habit: Pick<Habit, "frequencyType" | "daysO
   if (habit.frequencyType === "daily") return "Diário";
   return `${habitFrequencyLabel(habit.frequencyType)} · ${habitScheduleLabel(habit)}`;
 }
+
+export const investmentOperationOptions: readonly {
+  readonly value: InvestmentOperationType;
+  readonly label: string;
+}[] = [
+  { value: "buy", label: "Compra" },
+  { value: "sell", label: "Venda" },
+  { value: "dividend", label: "Dividendo" },
+  { value: "fee", label: "Taxa" },
+];
+
+export function investmentOperationLabel(type: InvestmentOperationType): string {
+  return investmentOperationOptions.find((option) => option.value === type)?.label ?? type;
+}
+
+/** Sugestões de classe de ativo; a API aceita qualquer texto. */
+export const assetClassSuggestions: readonly string[] = [
+  "Ações",
+  "FIIs",
+  "ETFs",
+  "Renda fixa",
+  "Cripto",
+  "Fundos",
+  "Previdência",
+  "Outros",
+];

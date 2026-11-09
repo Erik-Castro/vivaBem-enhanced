@@ -25,8 +25,12 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Tela de hábitos com abas de hábitos e gatilhos, check-in diário, sequência
   atual/recorde, calendário mensal, registro/remoção de logs e criação,
   edição, desativação e reativação de hábitos e gatilhos de substituição.
+- Tela de investimentos com carteira consolidada por moeda, posições, criação e
+  edição de ativos (moeda travada após a primeira operação), registro de
+  compras, vendas, dividendos e taxas, cotações, remoção com soft delete e
+  detalhe com custo médio, valor de mercado e resultado.
 - Navegação mobile com cinco atalhos fixos e menu "Mais" em bottom sheet para
-  categorias, hábitos, configurações e telas ainda em "em breve".
+  categorias, hábitos, investimentos, configurações e telas ainda em "em breve".
 - Tema claro/escuro com design tokens em CSS próprio, layout responsivo com
   sidebar e navegação inferior, e toast de feedback.
 - PWA com manifest, ícones PNG/SVG (`192`, `512`, maskable e apple-touch) e
