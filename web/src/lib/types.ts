@@ -122,6 +122,37 @@ export interface TransactionSummary {
   readonly currencies: readonly CurrencySummary[];
 }
 
+export type BudgetPeriodType = "monthly" | "yearly" | "custom";
+
+export interface Budget {
+  readonly id: string;
+  readonly categoryId: string | null;
+  readonly categoryName: string | null;
+  readonly name: string;
+  readonly limitMinor: number;
+  readonly currencyCode: string;
+  readonly periodType: BudgetPeriodType;
+  readonly startDate: string;
+  readonly endDate: string | null;
+  readonly alertThreshold: number;
+  readonly isActive: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export type BudgetLevel = "ok" | "warning" | "exceeded";
+
+export interface BudgetStatus {
+  readonly budget: Budget;
+  readonly period: { readonly from: string; readonly to: string };
+  readonly spentMinor: number;
+  readonly remainingMinor: number;
+  readonly percentUsed: number;
+  readonly level: BudgetLevel;
+  readonly crossedThresholds: readonly number[];
+  readonly isPeriodActive: boolean;
+}
+
 export interface Session {
   readonly id: string;
   readonly ipAddress: string | null;

@@ -6,6 +6,7 @@
   import { auth } from "./lib/auth.svelte";
   import { router } from "./lib/router.svelte";
   import Accounts from "./pages/Accounts.svelte";
+  import Budgets from "./pages/Budgets.svelte";
   import Categories from "./pages/Categories.svelte";
   import ComingSoon from "./pages/ComingSoon.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
@@ -18,12 +19,6 @@
   const publicRoutes = new Set(["/login", "/register"]);
 
   const comingSoon: Record<string, { title: string; description: string; icon: IconName }> = {
-    "/budgets": {
-      title: "Orçamentos",
-      description:
-        "Defina limites por categoria, acompanhe o consumo e receba alertas antes de estourar.",
-      icon: "chart",
-    },
     "/goals": {
       title: "Metas",
       description:
@@ -90,6 +85,8 @@
       <Transactions />
     {:else if router.path === "/categories"}
       <Categories />
+    {:else if router.path === "/budgets"}
+      <Budgets />
     {:else if router.path === "/settings"}
       <Settings />
     {:else if soon}

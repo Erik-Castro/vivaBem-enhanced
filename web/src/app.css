@@ -667,9 +667,15 @@ ol {
   color: var(--muted);
 }
 
-.badge--pending {
+.badge--pending,
+.badge--warning {
   background: var(--warning-soft);
   color: var(--warning);
+}
+
+.badge--danger {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .badge--soon {
@@ -1093,6 +1099,14 @@ ol {
   transition: width 0.4s ease;
 }
 
+.bar-fill--warning {
+  background: linear-gradient(90deg, var(--warning), #d3a326);
+}
+
+.bar-fill--danger {
+  background: linear-gradient(90deg, var(--danger), #d95f45);
+}
+
 .currency-balances {
   display: flex;
   flex-wrap: wrap;
@@ -1341,6 +1355,86 @@ ol {
   display: flex;
   align-items: center;
   gap: 3px;
+  margin-left: auto;
+}
+
+/* ==========================================================================
+   Orçamentos
+   ========================================================================== */
+
+.toolbar__field {
+  max-width: 220px;
+}
+
+.budget-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.budget-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.budget-row:last-child {
+  border-bottom: 0;
+}
+
+.budget-row--inactive {
+  opacity: 0.68;
+}
+
+.budget-row__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.budget-row__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.budget-row__title strong {
+  font-size: 0.95rem;
+}
+
+.budget-row__title .muted {
+  font-size: 0.76rem;
+}
+
+.budget-row__values {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.budget-row__values > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.budget-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.budget-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-left: auto;
 }
 
@@ -2145,6 +2239,26 @@ ol {
 
   .cat-depth {
     display: none;
+  }
+
+  .toolbar__field {
+    max-width: none;
+    width: 100%;
+  }
+
+  .budget-row__head {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .budget-row__values {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .budget-row__actions {
+    margin-left: 0;
+    width: 100%;
   }
 
   .stat__value {

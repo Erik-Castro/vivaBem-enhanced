@@ -23,11 +23,11 @@
     { path: "/transactions", label: "Transações", icon: "arrows" },
     { path: "/accounts", label: "Contas", icon: "wallet" },
     { path: "/categories", label: "Categorias", icon: "tag" },
+    { path: "/budgets", label: "Orçamentos", icon: "chart" },
     { path: "/settings", label: "Configurações", icon: "sliders" },
   ];
 
   const comingSoonNav: NavItem[] = [
-    { path: "/budgets", label: "Orçamentos", icon: "chart" },
     { path: "/goals", label: "Metas", icon: "target" },
     { path: "/habits", label: "Hábitos", icon: "heart" },
     { path: "/investments", label: "Investimentos", icon: "piggy" },

@@ -16,6 +16,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   transações (filtros, paginação, criação, edição, remoção, compensação e
   transferência entre contas), categorias (árvore e subcategorias) e
   configurações (perfil, preferências, sessões e sair).
+- Tela de orçamentos com seleção de mês de referência, totais por moeda,
+  progresso por categoria/subárvore, níveis `ok`/`warning`/`exceeded`, criação,
+  edição, desativação e reativação (`DELETE` apenas desativa o orçamento).
 - Tema claro/escuro com design tokens em CSS próprio, layout responsivo com
   sidebar e navegação inferior, e toast de feedback.
 - PWA com manifest, ícones PNG/SVG (`192`, `512`, maskable e apple-touch) e

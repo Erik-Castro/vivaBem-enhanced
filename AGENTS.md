@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP entregue
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas, versão `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP e a tela de orçamentos entregues
 
 ---
 
@@ -196,7 +196,7 @@ web/
     lib/                # api, auth, router, theme, toast, format, types
     components/         # AppShell, modais, linha de transação
     pages/              # login, register, dashboard, accounts, transactions,
-                        # categories, settings, coming-soon, not-found
+                        # categories, budgets, settings, coming-soon, not-found
 docs/
   PLAN.md API.md ARCHITECTURE.md DECISIONS.md DEPLOY.md FRONTEND.md
 ```
@@ -674,7 +674,7 @@ deno test --coverage
 | 7 | Eventos + IA: outbox, worker, provider, prompts, tools, insights, embeddings | ✅ `0.8.0` |
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ✅ `0.9.0` |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ✅ `0.10.0` |
-| 10 | Frontend Svelte 5 + Vite/PWA | 🚧 MVP entregue (auth, painel, contas, transações, categorias, PWA, deploy) |
+| 10 | Frontend Svelte 5 + Vite/PWA | 🚧 MVP + orçamentos entregues (auth, painel, contas, transações, categorias, orçamentos, PWA, deploy) |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 
@@ -692,6 +692,8 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `web/src/lib/auth.svelte.ts` | Store de sessão |
 | `web/src/lib/router.svelte.ts` | Hash router |
 | `web/src/pages/Transactions.svelte` | Lista, filtros e ações de transações |
+| `web/src/pages/Budgets.svelte` | Status por mês, progresso e ativação de orçamentos |
+| `web/src/components/BudgetFormModal.svelte` | Criação/edição de orçamentos |
 | `web/src/components/TransactionFormModal.svelte` | Criação/edição de transações e transferências |
 | `web/src/app.css` | Design system, tema e responsividade |
 | `web/nginx.conf` | SPA fallback, proxy da API, CSP e cache |

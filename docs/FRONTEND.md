@@ -100,7 +100,7 @@ web/
       icons.ts          # ícones SVG inline
     components/         # AppShell, modais, linha de transação, toasts
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
-                        # Categories, Settings, ComingSoon, NotFound
+                        # Categories, Budgets, Settings, ComingSoon, NotFound
 ```
 
 ### 4.1 Rotas
@@ -113,8 +113,9 @@ web/
 | `#/accounts` | sim | Contas, cartões, saldo e ativação |
 | `#/transactions` | sim | Lista, filtros, criação, edição, remoção, compensação e transferência |
 | `#/categories` | sim | Árvore de categorias e subcategorias |
+| `#/budgets` | sim | Orçamentos por mês, progresso, alertas e ativação |
 | `#/settings` | sim | Perfil, preferências, sessões e sair |
-| `#/budgets`, `#/goals`, `#/habits`, `#/investments`, `#/achievements` | sim | Placeholder "em breve" |
+| `#/goals`, `#/habits`, `#/investments`, `#/achievements` | sim | Placeholder "em breve" |
 | qualquer outra | sim | Página não encontrada |
 
 Rotas públicas redirecionam usuários autenticados para o painel; rotas
@@ -233,6 +234,6 @@ frontend e, em HTTP local, `COOKIE_SECURE=false`.
   renderizadas no servidor nem indexáveis.
 - Sem cache offline de dados, fila de mutações ou sincronização em segundo plano.
 - Lista de transações usa paginação por `limit`/`offset`, sem virtualização.
-- Ainda não há telas para orçamentos, metas, hábitos, investimentos e
-  conquistas; as rotas existem com placeholder.
+- Ainda não há telas para metas, hábitos, investimentos e conquistas; as rotas
+  existem com placeholder.
 - Sem testes de unidade de componentes (apenas typecheck e build no CI).
