@@ -100,7 +100,8 @@ web/
       icons.ts          # ícones SVG inline
     components/         # AppShell, modais, linha de transação, toasts
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
-                        # Categories, Budgets, Settings, ComingSoon, NotFound
+                        # Categories, Budgets, Goals, Settings, ComingSoon,
+                        # NotFound
 ```
 
 ### 4.1 Rotas
@@ -114,8 +115,9 @@ web/
 | `#/transactions` | sim | Lista, filtros, criação, edição, remoção, compensação e transferência |
 | `#/categories` | sim | Árvore de categorias e subcategorias |
 | `#/budgets` | sim | Orçamentos por mês, progresso, alertas e ativação |
+| `#/goals` | sim | Metas por status, progresso e contribuições |
 | `#/settings` | sim | Perfil, preferências, sessões e sair |
-| `#/goals`, `#/habits`, `#/investments`, `#/achievements` | sim | Placeholder "em breve" |
+| `#/habits`, `#/investments`, `#/achievements` | sim | Placeholder "em breve" |
 | qualquer outra | sim | Página não encontrada |
 
 Rotas públicas redirecionam usuários autenticados para o painel; rotas
@@ -173,7 +175,9 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
 - Componentes usam elementos nativos (`button`, `label`, `select`), foco visível,
   `aria-*` nos modais e mensagens de erro com `role="alert"`.
 - Layout responsivo: sidebar no desktop, navegação inferior no mobile (≤ 900px),
-  sem overflow horizontal em 390px.
+  sem overflow horizontal em 390px. No mobile, cinco atalhos fixos (Painel,
+  Transações, Contas, Orçamentos e Metas) e um menu "Mais" em bottom sheet com
+  as demais rotas.
 
 ---
 
@@ -234,6 +238,6 @@ frontend e, em HTTP local, `COOKIE_SECURE=false`.
   renderizadas no servidor nem indexáveis.
 - Sem cache offline de dados, fila de mutações ou sincronização em segundo plano.
 - Lista de transações usa paginação por `limit`/`offset`, sem virtualização.
-- Ainda não há telas para metas, hábitos, investimentos e conquistas; as rotas
-  existem com placeholder.
+- Ainda não há telas para hábitos, investimentos e conquistas; as rotas existem
+  com placeholder.
 - Sem testes de unidade de componentes (apenas typecheck e build no CI).

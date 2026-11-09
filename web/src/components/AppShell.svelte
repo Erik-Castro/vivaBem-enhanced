@@ -24,11 +24,11 @@
     { path: "/accounts", label: "Contas", icon: "wallet" },
     { path: "/categories", label: "Categorias", icon: "tag" },
     { path: "/budgets", label: "Orçamentos", icon: "chart" },
+    { path: "/goals", label: "Metas", icon: "target" },
     { path: "/settings", label: "Configurações", icon: "sliders" },
   ];
 
   const comingSoonNav: NavItem[] = [
-    { path: "/goals", label: "Metas", icon: "target" },
     { path: "/habits", label: "Hábitos", icon: "heart" },
     { path: "/investments", label: "Investimentos", icon: "piggy" },
     { path: "/achievements", label: "Conquistas", icon: "trophy" },
@@ -47,10 +47,29 @@
     "/achievements": "Conquistas",
   };
 
-  const mobileNav = mainNav.filter((item) => item.path !== "/settings");
+  const mobilePaths = new Set([
+    "/dashboard",
+    "/transactions",
+    "/accounts",
+    "/budgets",
+    "/goals",
+  ]);
+  const mobileNav = mainNav.filter((item) => mobilePaths.has(item.path));
+  const moreNav: NavItem[] = [
+    ...mainNav.filter((item) => !mobilePaths.has(item.path)),
+    ...comingSoonNav,
+  ];
+  const soonPaths = new Set(comingSoonNav.map((item) => item.path));
   const currentTitle = $derived(titles[router.path] ?? "Viva Bem");
 
   let loggingOut = $state(false);
+  let menuOpen = $state(false);
+
+  $effect(() => {
+    // Fecha o menu "Mais" sempre que a rota muda.
+    router.path;
+    menuOpen = false;
+  });
 
   function isActive(path: string): boolean {
     return router.path === path;
@@ -176,16 +195,44 @@
         <span>{item.label}</span>
       </a>
     {/each}
-    <a
+    <button
       class="mobile-nav__link"
-      class:active={isActive("/settings")}
-      href="#/settings"
-      aria-current={isActive("/settings") ? "page" : undefined}
+      class:active={moreNav.some((item) => isActive(item.path))}
+      type="button"
+      aria-expanded={menuOpen}
+      onclick={() => (menuOpen = !menuOpen)}
     >
       <Icon name="sliders" size={22} />
       <span>Mais</span>
-    </a>
+    </button>
   </nav>
+
+  {#if menuOpen}
+    <div class="mobile-menu-layer">
+      <button
+        class="mobile-menu-backdrop"
+        type="button"
+        aria-label="Fechar menu"
+        onclick={() => (menuOpen = false)}
+      ></button>
+      <nav class="mobile-menu" aria-label="Mais opções">
+        <span class="mobile-menu__title">Mais</span>
+        {#each moreNav as item (item.path)}
+          <a
+            class="mobile-menu__link"
+            class:active={isActive(item.path)}
+            class:mobile-menu__link--muted={soonPaths.has(item.path)}
+            href={`#${item.path}`}
+            aria-current={isActive(item.path) ? "page" : undefined}
+            onclick={() => (menuOpen = false)}
+          >
+            <Icon name={item.icon} size={20} />
+            <span>{item.label}</span>
+          </a>
+        {/each}
+      </nav>
+    </div>
+  {/if}
 
   <ToastHost />
 </div>

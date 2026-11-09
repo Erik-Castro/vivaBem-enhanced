@@ -19,6 +19,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - Tela de orçamentos com seleção de mês de referência, totais por moeda,
   progresso por categoria/subárvore, níveis `ok`/`warning`/`exceeded`, criação,
   edição, desativação e reativação (`DELETE` apenas desativa o orçamento).
+- Tela de metas com abas por status, progresso por meta, criação, edição,
+  pausa/retomada, cancelamento (`DELETE` apenas cancela) e um detalhe com
+  histórico de contribuições (adicionar e remover).
+- Navegação mobile com cinco atalhos fixos e menu "Mais" em bottom sheet para
+  categorias, configurações e telas ainda em "em breve".
 - Tema claro/escuro com design tokens em CSS próprio, layout responsivo com
   sidebar e navegação inferior, e toast de feedback.
 - PWA com manifest, ícones PNG/SVG (`192`, `512`, maskable e apple-touch) e

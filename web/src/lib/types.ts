@@ -153,6 +153,45 @@ export interface BudgetStatus {
   readonly isPeriodActive: boolean;
 }
 
+export type GoalStatus = "active" | "paused" | "completed" | "cancelled";
+
+export interface Goal {
+  readonly id: string;
+  readonly targetAccountId: string | null;
+  readonly targetAccountName: string | null;
+  readonly name: string;
+  readonly description: string | null;
+  readonly targetAmountMinor: number;
+  readonly currencyCode: string;
+  readonly targetDate: string | null;
+  readonly status: GoalStatus;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface GoalContribution {
+  readonly id: string;
+  readonly goalId: string;
+  readonly accountId: string | null;
+  readonly accountName: string | null;
+  readonly transactionId: string | null;
+  readonly amountMinor: number;
+  readonly contributionDate: string;
+  readonly note: string | null;
+  readonly createdAt: string;
+}
+
+export interface GoalProgress {
+  readonly goal: Goal;
+  readonly contributions: readonly GoalContribution[];
+  readonly contributedMinor: number;
+  readonly remainingMinor: number;
+  readonly progressPercent: number;
+  readonly isCompleted: boolean;
+  readonly contributionCount: number;
+  readonly lastContributionDate: string | null;
+}
+
 export interface Session {
   readonly id: string;
   readonly ipAddress: string | null;
