@@ -151,6 +151,63 @@ export function migrate(
   return { applied: executed, total: migrations.length };
 }
 
+/**
+ * Verifica se o banco está exatamente no schema esperado, sem aplicar nada.
+ *
+ * O worker não migra: dono das migrações é a API. Se a API ainda não subiu com a
+ * versão atual, o worker falha no boot com uma mensagem acionável em vez de
+ * processar eventos com colunas ausentes.
+ *
+ * @throws {MigrationError} quando falta migração, sobra migração ou o checksum
+ * diverge.
+ */
+export function assertSchemaCurrent(
+  db: AppDatabase,
+  migrations: readonly MigrationFile[],
+): void {
+  const schemaTable = db
+    .prepare<[], { name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'",
+    )
+    .get();
+
+  if (schemaTable === undefined) {
+    throw new MigrationError(
+      "Banco não migrado: inicie a API (`deno task db:migrate`) antes do worker",
+    );
+  }
+
+  const applied = db
+    .prepare<[], AppliedMigrationRow>(
+      "SELECT version, name, checksum FROM schema_migrations ORDER BY version",
+    )
+    .all();
+  const available = new Map(migrations.map((migration) => [migration.version, migration]));
+  const appliedVersions = new Set(applied.map((row) => row.version));
+
+  for (const row of applied) {
+    const file = available.get(row.version);
+    if (!file) {
+      throw new MigrationError(
+        `Migração ${row.version} está aplicada no banco, mas o arquivo não existe mais`,
+      );
+    }
+    if (file.checksum !== row.checksum) {
+      throw new MigrationError(
+        `Checksum divergente na migração ${row.version} (${row.name})`,
+      );
+    }
+  }
+
+  const pending = migrations.filter((migration) => !appliedVersions.has(migration.version));
+  if (pending.length > 0) {
+    const versions = pending.map((migration) => migration.name).join(", ");
+    throw new MigrationError(
+      `Schema desatualizado: inicie a API para aplicar ${versions} antes do worker`,
+    );
+  }
+}
+
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");

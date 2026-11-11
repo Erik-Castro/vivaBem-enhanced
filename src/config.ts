@@ -60,6 +60,42 @@ export interface AppConfig {
   readonly ai: AiConfig;
 }
 
+/** Parâmetros operacionais do processo de consumo da outbox. */
+export interface WorkerRuntimeConfig {
+  /** Identificador da instância; quando ausente, o entry point gera um. */
+  readonly id?: string;
+  readonly pollIntervalMs: number;
+  readonly leaseMs: number;
+  readonly heartbeatMs: number;
+  readonly maxAttempts: number;
+  readonly concurrency: number;
+  readonly shutdownGraceMs: number;
+  readonly maxEventsPerBatch: number;
+}
+
+/**
+ * Configuração do worker.
+ *
+ * Não carrega credenciais HTTP (JWT, cookies, origem): o processo só precisa de
+ * banco, IA e parâmetros de consumo.
+ */
+export interface WorkerConfig {
+  readonly env: AppEnv;
+  readonly isProduction: boolean;
+  readonly databasePath: string;
+  readonly logLevel: LogLevel;
+  readonly vectorExtensionPath?: string;
+  readonly ai: AiConfig;
+  readonly worker: WorkerRuntimeConfig;
+}
+
+/**
+ * Menor fatia de configuração exigida por provider, processor, executor e
+ * publisher. `AppConfig` e `WorkerConfig` a satisfazem estruturalmente, então o
+ * mesmo componente roda nos dois processos sem depender de campos HTTP.
+ */
+export type AiConfigSource = Pick<AppConfig, "ai">;
+
 export class ConfigError extends Error {
   readonly details: readonly string[];
 
@@ -92,6 +128,13 @@ const optionalPositiveInt = z.preprocess(
   emptyToUndefined,
   z.coerce.number().int().positive().optional(),
 );
+const optionalInt = (min: number, max?: number) =>
+  z.preprocess(
+    emptyToUndefined,
+    max === undefined
+      ? z.coerce.number().int().min(min).optional()
+      : z.coerce.number().int().min(min).max(max).optional(),
+  );
 
 const duration = z
   .string()
@@ -129,7 +172,18 @@ const rawConfigSchema = z.object({
   AI_CORRELATION_THRESHOLD: z.coerce.number().int().min(1).default(50),
   AI_OLLAMA_URL: z.string().url().default("http://localhost:11434"),
   AI_MODEL: optionalString,
+  // Worker independente. Sem valor, cada campo cai no equivalente de AI_* para
+  // não quebrar `.env` existentes (ver `loadWorkerConfig`).
+  WORKER_ID: optionalString,
+  WORKER_POLL_INTERVAL_MS: optionalInt(50),
+  WORKER_LEASE_MS: optionalInt(1_000),
+  WORKER_HEARTBEAT_MS: optionalInt(100),
+  WORKER_MAX_ATTEMPTS: optionalInt(1, 20),
+  WORKER_CONCURRENCY: optionalInt(1, 8),
+  WORKER_SHUTDOWN_GRACE_MS: optionalInt(0),
 });
+
+type RawConfig = z.infer<typeof rawConfigSchema>;
 
 /**
  * Lê e valida toda a configuração de ambiente.
@@ -141,16 +195,7 @@ const rawConfigSchema = z.object({
 export function loadConfig(
   env: Record<string, string | undefined> = Deno.env.toObject(),
 ): AppConfig {
-  const parsed = rawConfigSchema.safeParse(env);
-  if (!parsed.success) {
-    const details = parsed.error.issues.map((issue) => {
-      const path = issue.path.join(".") || "env";
-      return `${path}: ${issue.message}`;
-    });
-    throw new ConfigError("Configuração de ambiente inválida", details);
-  }
-
-  const raw = parsed.data;
+  const raw = parseEnv(env);
   const isProduction = raw.ENV === "production";
 
   if (isProduction && !raw.JWT_SECRET) {
@@ -165,6 +210,97 @@ export function loadConfig(
     ]);
   }
 
+  assertAiConfig(raw);
+
+  const cookieSecure = raw.COOKIE_SECURE === "auto" ? isProduction : raw.COOKIE_SECURE === "true";
+  const jwtSecretIsEphemeral = raw.JWT_SECRET === undefined;
+
+  return {
+    env: raw.ENV,
+    isProduction,
+    port: raw.PORT,
+    databasePath: raw.DATABASE_PATH,
+    appOrigin: raw.APP_ORIGIN,
+    cookieSecure,
+    jwtSecret: raw.JWT_SECRET ?? generateEphemeralSecret(),
+    jwtSecretIsEphemeral,
+    accessTokenTtl: raw.ACCESS_TOKEN_TTL,
+    refreshTokenTtl: raw.REFRESH_TOKEN_TTL,
+    argon2: {
+      memoryKiB: raw.ARGON2_MEMORY_KIB,
+      iterations: raw.ARGON2_ITERATIONS,
+      parallelism: raw.ARGON2_PARALLELISM,
+    },
+    logLevel: raw.LOG_LEVEL,
+    vectorExtensionPath: raw.VECTOR_EXTENSION_PATH,
+    rateLimit: {
+      authMax: raw.RATE_LIMIT_AUTH_MAX,
+      dataMax: raw.RATE_LIMIT_DATA_MAX,
+      windowMs: (parseDurationSeconds(raw.RATE_LIMIT_WINDOW) ?? 60) * 1_000,
+    },
+    ai: toAiConfig(raw),
+  };
+}
+
+/**
+ * Configuração do processo worker.
+ *
+ * Reaproveita a validação de IA e banco, mas ignora credenciais HTTP (JWT,
+ * cookies, origem) — o worker não atende requisições. Os campos `WORKER_*` sem
+ * valor caem nos equivalentes de `AI_*` para preservar `.env` existentes.
+ *
+ * @throws {ConfigError} quando o ambiente é inválido ou `heartbeat >= lease`.
+ */
+export function loadWorkerConfig(
+  env: Record<string, string | undefined> = Deno.env.toObject(),
+): WorkerConfig {
+  const raw = parseEnv(env);
+  assertAiConfig(raw);
+
+  const heartbeatMs = raw.WORKER_HEARTBEAT_MS ?? 15_000;
+  const leaseMs = raw.WORKER_LEASE_MS ?? Math.max(60_000, raw.AI_REQUEST_TIMEOUT * 2);
+
+  if (heartbeatMs >= leaseMs) {
+    throw new ConfigError("Configuração de ambiente inválida", [
+      "WORKER_HEARTBEAT_MS: deve ser menor que WORKER_LEASE_MS",
+    ]);
+  }
+
+  return {
+    env: raw.ENV,
+    isProduction: raw.ENV === "production",
+    databasePath: raw.DATABASE_PATH,
+    logLevel: raw.LOG_LEVEL,
+    vectorExtensionPath: raw.VECTOR_EXTENSION_PATH,
+    ai: toAiConfig(raw),
+    worker: {
+      id: raw.WORKER_ID,
+      pollIntervalMs: raw.WORKER_POLL_INTERVAL_MS ?? raw.AI_WORKER_INTERVAL,
+      leaseMs,
+      heartbeatMs,
+      maxAttempts: raw.WORKER_MAX_ATTEMPTS ?? raw.AI_MAX_RETRIES + 1,
+      concurrency: raw.WORKER_CONCURRENCY ?? 1,
+      shutdownGraceMs: raw.WORKER_SHUTDOWN_GRACE_MS ?? 30_000,
+      maxEventsPerBatch: raw.AI_MAX_EVENTS_PER_BATCH,
+    },
+  };
+}
+
+/** Valida o ambiente bruto e devolve os valores já convertidos. */
+function parseEnv(env: Record<string, string | undefined>): RawConfig {
+  const parsed = rawConfigSchema.safeParse(env);
+  if (!parsed.success) {
+    const details = parsed.error.issues.map((issue) => {
+      const path = issue.path.join(".") || "env";
+      return `${path}: ${issue.message}`;
+    });
+    throw new ConfigError("Configuração de ambiente inválida", details);
+  }
+  return parsed.data;
+}
+
+/** Regras de IA compartilhadas entre API e worker. */
+function assertAiConfig(raw: RawConfig): void {
   if (raw.AI_ENABLED && raw.AI_PROVIDER === "openai" && !raw.AI_API_BASE_URL) {
     throw new ConfigError("Configuração de ambiente inválida", [
       "AI_API_BASE_URL: obrigatório quando AI_ENABLED=true e AI_PROVIDER=openai",
@@ -194,50 +330,25 @@ export function loadConfig(
       "AI_EMBEDDING_DIMENSIONS: obrigatório quando AI_ENABLED=true",
     ]);
   }
+}
 
-  const cookieSecure = raw.COOKIE_SECURE === "auto" ? isProduction : raw.COOKIE_SECURE === "true";
-  const jwtSecretIsEphemeral = raw.JWT_SECRET === undefined;
-
+function toAiConfig(raw: RawConfig): AiConfig {
   return {
-    env: raw.ENV,
-    isProduction,
-    port: raw.PORT,
-    databasePath: raw.DATABASE_PATH,
-    appOrigin: raw.APP_ORIGIN,
-    cookieSecure,
-    jwtSecret: raw.JWT_SECRET ?? generateEphemeralSecret(),
-    jwtSecretIsEphemeral,
-    accessTokenTtl: raw.ACCESS_TOKEN_TTL,
-    refreshTokenTtl: raw.REFRESH_TOKEN_TTL,
-    argon2: {
-      memoryKiB: raw.ARGON2_MEMORY_KIB,
-      iterations: raw.ARGON2_ITERATIONS,
-      parallelism: raw.ARGON2_PARALLELISM,
-    },
-    logLevel: raw.LOG_LEVEL,
-    vectorExtensionPath: raw.VECTOR_EXTENSION_PATH,
-    rateLimit: {
-      authMax: raw.RATE_LIMIT_AUTH_MAX,
-      dataMax: raw.RATE_LIMIT_DATA_MAX,
-      windowMs: (parseDurationSeconds(raw.RATE_LIMIT_WINDOW) ?? 60) * 1_000,
-    },
-    ai: {
-      enabled: raw.AI_ENABLED,
-      provider: raw.AI_PROVIDER,
-      apiBaseUrl: raw.AI_API_BASE_URL,
-      apiKey: raw.AI_API_KEY,
-      chatModel: raw.AI_API_MODEL_CHAT_NAME,
-      embeddingsModel: raw.AI_API_MODEL_EMBEDDINGS_NAME,
-      embeddingDimensions: raw.AI_EMBEDDING_DIMENSIONS,
-      requestTimeoutMs: raw.AI_REQUEST_TIMEOUT,
-      workerIntervalMs: raw.AI_WORKER_INTERVAL,
-      maxRetries: raw.AI_MAX_RETRIES,
-      confidenceThreshold: raw.AI_CONFIDENCE_THRESHOLD,
-      maxEventsPerBatch: raw.AI_MAX_EVENTS_PER_BATCH,
-      correlationThreshold: raw.AI_CORRELATION_THRESHOLD,
-      ollamaUrl: raw.AI_OLLAMA_URL,
-      ollamaModel: raw.AI_MODEL,
-    },
+    enabled: raw.AI_ENABLED,
+    provider: raw.AI_PROVIDER,
+    apiBaseUrl: raw.AI_API_BASE_URL,
+    apiKey: raw.AI_API_KEY,
+    chatModel: raw.AI_API_MODEL_CHAT_NAME,
+    embeddingsModel: raw.AI_API_MODEL_EMBEDDINGS_NAME,
+    embeddingDimensions: raw.AI_EMBEDDING_DIMENSIONS,
+    requestTimeoutMs: raw.AI_REQUEST_TIMEOUT,
+    workerIntervalMs: raw.AI_WORKER_INTERVAL,
+    maxRetries: raw.AI_MAX_RETRIES,
+    confidenceThreshold: raw.AI_CONFIDENCE_THRESHOLD,
+    maxEventsPerBatch: raw.AI_MAX_EVENTS_PER_BATCH,
+    correlationThreshold: raw.AI_CORRELATION_THRESHOLD,
+    ollamaUrl: raw.AI_OLLAMA_URL,
+    ollamaModel: raw.AI_MODEL,
   };
 }
 

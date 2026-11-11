@@ -12,18 +12,7 @@ import { AccountsRepository } from "./modules/accounts/accounts.repository.ts";
 import { CategoriesRepository } from "./modules/categories/categories.repository.ts";
 import { seedAchievements } from "./modules/achievements/achievements.seed.ts";
 import { EventPublisher } from "./events/event-publisher.ts";
-import { EventWorker } from "./events/worker.ts";
-import { createAiProvider } from "./ai/providers/factory.ts";
-import { createContextRegistry } from "./ai/ai.context.ts";
-import { AiToolExecutor } from "./ai/ai.executor.ts";
-import { AiProcessor } from "./ai/ai.processor.ts";
-import { EmbeddingsService } from "./ai/embeddings.service.ts";
-import { CorrelationScheduler } from "./ai/ai.correlation.ts";
-import { createAiToolRegistry } from "./ai/tools/index.ts";
-import { AuthRepository } from "./modules/auth/auth.repository.ts";
-import { InsightsRepository } from "./modules/insights/insights.repository.ts";
-import { NotificationsRepository } from "./modules/notifications/notifications.repository.ts";
-import { IpBlocklistRepository } from "./modules/security/ip-blocklist.repository.ts";
+import { createEmbeddingsService } from "./ai/ai.runtime.ts";
 
 const encoder = new TextEncoder();
 
@@ -57,6 +46,8 @@ const db = createDatabase({
   vectorExtensionPath: config.vectorExtensionPath,
 });
 
+// A API é dona do schema: o worker independente apenas verifica se ele está em
+// dia (`assertSchemaCurrent`). Migração nunca roda em dois processos.
 try {
   const migrations = await loadMigrations();
   const result = migrate(db, migrations, logger);
@@ -85,52 +76,11 @@ function applyMaintenance(): void {
 applyMaintenance();
 const maintenanceTimer = setInterval(applyMaintenance, 24 * 60 * 60 * 1_000);
 
-/**
- * Monta o pipeline de IA quando habilitado. Sem `AI_ENABLED`, retorna `null`:
- * nenhum provider é instanciado e nenhum worker roda.
- */
-function createAiRuntime(): { embeddings: EmbeddingsService; worker: EventWorker } | null {
-  const provider = createAiProvider(config);
-  if (provider === null) return null;
+// A API consome o outbox apenas pela leitura de embeddings. Provider, processor,
+// executor e correlações vivem no processo `src/worker/main.ts`.
+const embeddings = createEmbeddingsService({ db, config, logger });
 
-  const publisher = new EventPublisher({ db, config, logger });
-  const embeddings = new EmbeddingsService({ db, provider, logger });
-  const registry = createAiToolRegistry({
-    notifications: new NotificationsRepository(db),
-    insights: new InsightsRepository(db),
-    auth: new AuthRepository(db),
-    blocklist: new IpBlocklistRepository(db),
-    logger,
-  });
-  const executor = new AiToolExecutor({ db, config, logger, registry, publisher });
-  const processor = new AiProcessor({
-    config,
-    logger,
-    provider,
-    contexts: createContextRegistry(db),
-    executor,
-    embeddings,
-  });
-  const correlations = new CorrelationScheduler({
-    db,
-    publisher,
-    threshold: config.ai.correlationThreshold,
-  });
-  const worker = new EventWorker({ db, config, logger, processor, correlations });
-
-  logger.info("ai_runtime_ready", {
-    provider: provider.name,
-    chatModel: provider.chatModel,
-    embeddingsModel: provider.embeddingsModel,
-    dimensions: provider.embeddingDimensions,
-    vectorEnabled: db.vectorEnabled,
-  });
-
-  return { embeddings, worker };
-}
-
-const aiRuntime = createAiRuntime();
-const app = createApp({ db, config, logger, embeddings: aiRuntime?.embeddings ?? null });
+const app = createApp({ db, config, logger, embeddings });
 
 // Catálogo de conquistas é idempotente por título: reiniciar não duplica.
 try {
@@ -164,8 +114,6 @@ try {
   });
 }
 
-aiRuntime?.worker.start();
-
 const server = Deno.serve(
   {
     port: config.port,
@@ -190,7 +138,6 @@ async function shutdown(signal: string): Promise<void> {
 
   logger.info("shutdown_started", { signal });
 
-  aiRuntime?.worker.stop();
   clearInterval(maintenanceTimer);
 
   try {

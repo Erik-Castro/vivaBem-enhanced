@@ -3,6 +3,8 @@
   "tasks": {
     "dev": "deno run --env-file=.env.example --watch --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/main.ts",
     "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/main.ts",
+    "dev:worker": "deno run --env-file=.env.example --watch --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/worker/main.ts",
+    "worker": "deno run --allow-net --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/worker/main.ts",
     "test": "deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi --allow-net tests/",
     "test:coverage": "deno test --allow-read --allow-write --allow-env --allow-sys --allow-ffi --allow-net --coverage tests/",
     "check": "deno check src tests scripts",
@@ -12,6 +14,7 @@
     "db:migrate": "deno run --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/db/migrate-cli.ts",
     "db:reset": "deno run --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/db/reset-cli.ts",
     "db:backup": "deno run --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/db/backup-cli.ts",
+    "outbox:replay": "deno run --allow-read --allow-write --allow-env --allow-sys --allow-ffi src/events/replay-cli.ts",
     "check:release": "deno run --allow-read scripts/check-release.ts"
   },
   "imports": {
