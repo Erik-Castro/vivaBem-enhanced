@@ -46,7 +46,8 @@
       "node_modules",
       "web",
       "AGENTS.md",
-      "CHANGELOG.md"
+      "CHANGELOG.md",
+      "portainer-stack.yml"
     ]
   },
   "lint": {
