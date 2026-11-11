@@ -411,6 +411,48 @@ export interface UpcomingOccurrence {
   readonly occurrenceDate: string;
 }
 
+export type ImportFormat = "csv" | "ofx";
+
+export interface ImportRowError {
+  readonly line: number;
+  readonly message: string;
+}
+
+export interface ImportPreviewRow {
+  readonly line: number;
+  readonly transactionDate: string;
+  readonly type: RecurringType;
+  readonly amountMinor: number;
+  readonly description: string | null;
+  readonly externalId: string | null;
+  readonly importHash: string;
+  readonly duplicate: boolean;
+}
+
+export interface ImportPreview {
+  readonly accountId: string;
+  readonly currencyCode: string;
+  readonly fileName: string | null;
+  readonly format: ImportFormat;
+  readonly totalRows: number;
+  readonly validRows: number;
+  readonly newRows: number;
+  readonly duplicateRows: number;
+  readonly rows: readonly ImportPreviewRow[];
+  readonly errors: readonly ImportRowError[];
+}
+
+export interface ImportResult {
+  readonly accountId: string;
+  readonly currencyCode: string;
+  readonly fileName: string | null;
+  readonly format: ImportFormat;
+  readonly imported: number;
+  readonly skipped: number;
+  readonly transactionIds: readonly string[];
+  readonly errors: readonly ImportRowError[];
+}
+
 export type NotificationCategory =
   | "finance"
   | "habit"

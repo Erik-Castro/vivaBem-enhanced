@@ -10,6 +10,7 @@
   import Categories from "./pages/Categories.svelte";
   import ComingSoon from "./pages/ComingSoon.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
+  import Data from "./pages/Data.svelte";
   import Goals from "./pages/Goals.svelte";
   import Habits from "./pages/Habits.svelte";
   import Investments from "./pages/Investments.svelte";
@@ -67,6 +68,8 @@
       <Transactions />
     {:else if router.path === "/recurring"}
       <Recurring />
+    {:else if router.path === "/data"}
+      <Data />
     {:else if router.path === "/categories"}
       <Categories />
     {:else if router.path === "/budgets"}

@@ -103,8 +103,8 @@ web/
                         # sino e painel de notificações
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
                         # Categories, Budgets, Goals, Habits, Investments,
-                        # Achievements, Notifications, Recurring, Settings,
-                        # ComingSoon, NotFound
+                        # Achievements, Notifications, Recurring, Data,
+                        # Settings, ComingSoon, NotFound
 ```
 
 ### 4.1 Rotas
@@ -117,6 +117,7 @@ web/
 | `#/accounts` | sim | Contas, cartões, saldo e ativação |
 | `#/transactions` | sim | Lista, filtros, criação, edição, remoção, compensação e transferência |
 | `#/recurring` | sim | Recorrências, próximas ocorrências, execução, pausa e reativação |
+| `#/data` | sim | Importação de CSV/OFX com prévia e exportação JSON/CSV |
 | `#/categories` | sim | Árvore de categorias e subcategorias |
 | `#/budgets` | sim | Orçamentos por mês, progresso, alertas e ativação |
 | `#/goals` | sim | Metas por status, progresso e contribuições |
@@ -202,6 +203,21 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
 - O formulário aceita apenas `income`/`expense`, exige conta ativa, deriva a
   moeda da conta e mostra o dia do mês somente em frequências mensais/anuais.
   O intervalo vai de 1 a 60 e a data final é opcional.
+
+### 4.8 Dados (importação e exportação)
+
+- `Data.svelte` tem abas "Importar" e "Exportar". A importação envia
+  `multipart/form-data` por `api()` (novo campo `form` em `RequestOptions`) para
+  `POST /import/preview` e `POST /import/commit`.
+- O formulário exige uma conta ativa, valida o tamanho localmente (1 MB), deixa
+  a API detectar CSV/OFX pelo conteúdo e mostra uma prévia com totais de linhas
+  novas/duplicadas e erros por linha. O commit fica desabilitado quando não há
+  linhas novas; reimportar o mesmo arquivo não duplica transações.
+- A exportação JSON usa `api()` e baixa o bundle por `Blob`; a exportação CSV
+  usa `download()` (GET autenticado por cookie, sem CSRF) e respeita o
+  `Content-Disposition` devolvido pela API.
+- Os cards explicam o conteúdo de cada arquivo e deixam claro que senhas,
+  tokens e embeddings nunca entram no backup.
 
 ---
 

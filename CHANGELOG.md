@@ -9,6 +9,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
+- Tela de dados (`#/data`) com importação de CSV/OFX (prévia de linhas
+  novas/duplicadas, erros por linha e commit idempotente) e exportação do backup
+  JSON completo ou das transações em CSV.
 - Tela de recorrências (`#/recurring`) com lista de ativas e pausadas,
   projeção de próximas ocorrências (30/60/90 dias), criação, edição,
   "Executar agora" e pausa/reativação sem apagar o histórico.

@@ -41,6 +41,7 @@
     { path: "/investments", label: "Investimentos", icon: "piggy" },
     { path: "/achievements", label: "Conquistas", icon: "trophy" },
     { path: "/notifications", label: "Notificações", icon: "bell" },
+    { path: "/data", label: "Dados", icon: "database" },
     { path: "/settings", label: "Configurações", icon: "sliders" },
   ];
 
@@ -60,6 +61,7 @@
     "/investments": "Investimentos",
     "/achievements": "Conquistas",
     "/notifications": "Notificações",
+    "/data": "Dados",
   };
 
   const mobilePaths = new Set([

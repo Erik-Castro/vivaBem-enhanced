@@ -22,6 +22,8 @@ export type QueryValue = string | number | boolean | undefined | null;
 export interface RequestOptions {
   readonly method?: string;
   readonly body?: unknown;
+  /** Envia `multipart/form-data`; o `Content-Type` é definido pelo navegador. */
+  readonly form?: FormData;
   readonly query?: Record<string, QueryValue>;
   /** `false` impede a tentativa automática de refresh em respostas 401. */
   readonly retry?: boolean;
@@ -172,7 +174,7 @@ export async function apiRequest<T>(
   const method = options.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json" };
 
-  if (options.body !== undefined) {
+  if (options.form === undefined && options.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -187,7 +189,7 @@ export async function apiRequest<T>(
       method,
       credentials: "include",
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.form ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
       signal: options.signal,
     });
   } catch (error) {
@@ -237,6 +239,57 @@ export async function apiRequest<T>(
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const envelope = await apiRequest<T>(path, options);
   return envelope.data;
+}
+
+export interface DownloadResult {
+  readonly blob: Blob;
+  readonly fileName: string | null;
+}
+
+/**
+ * Baixa um recurso autenticado por cookie (ex.: export CSV).
+ * Diferente de `api`, não espera um envelope JSON.
+ */
+export async function download(
+  path: string,
+  query?: Record<string, QueryValue>,
+  retry = true,
+): Promise<DownloadResult> {
+  let response: Response;
+
+  try {
+    response = await fetch(buildUrl(path, query), {
+      credentials: "include",
+      headers: { Accept: "*/*" },
+    });
+  } catch {
+    throw new ApiError(0, {
+      error: { code: "NETWORK_ERROR", message: "Sem conexão com o servidor" },
+    });
+  }
+
+  if (response.status === 401 && retry) {
+    const refreshed = await refreshSessionOnce();
+
+    if (refreshed) return download(path, query, false);
+  }
+
+  if (!response.ok) {
+    let payload: unknown = null;
+
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    throw new ApiError(response.status, payload);
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+
+  return { blob: await response.blob(), fileName: match?.[1] ?? null };
 }
 
 /** Traduz erros da API em uma mensagem curta para a interface. */
