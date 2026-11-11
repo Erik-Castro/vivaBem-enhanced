@@ -87,6 +87,10 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.8
+
       - name: Instalar dependências
         run: npm ci
 
