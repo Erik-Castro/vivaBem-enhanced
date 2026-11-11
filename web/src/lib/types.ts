@@ -529,6 +529,39 @@ export interface NotificationPayload {
   readonly notification: Notification;
 }
 
+export type InsightCategory =
+  | "finance"
+  | "habit"
+  | "security"
+  | "investment"
+  | "recommendation"
+  | "family"
+  | "correlation";
+
+export type InsightSeverity = "low" | "medium" | "high" | "critical";
+
+export type FeedbackRating = "helpful" | "not_helpful";
+
+export interface Insight {
+  readonly id: string;
+  readonly category: InsightCategory;
+  readonly severity: InsightSeverity;
+  readonly title: string;
+  readonly message: string;
+  readonly sourceEvent: string | null;
+  readonly confidence: number;
+  readonly isRead: boolean;
+  readonly createdAt: string;
+}
+
+export interface InsightFeedback {
+  readonly id: string;
+  readonly insightId: string;
+  readonly rating: FeedbackRating;
+  readonly comment: string | null;
+  readonly createdAt: string;
+}
+
 export interface UnreadCountPayload {
   readonly unread: number;
 }

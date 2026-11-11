@@ -1691,6 +1691,141 @@ ol {
 }
 
 /* ==========================================================================
+   Insights
+   ========================================================================== */
+
+.insight-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.insight-search__input {
+  width: 200px;
+  min-height: 34px;
+  padding: 5px 10px;
+  font-size: 0.82rem;
+}
+
+.insight-search-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.insight-search-summary strong {
+  color: var(--ink);
+}
+
+.insight-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insight-card {
+  display: flex;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.insight-card--unread {
+  border-left: 3px solid var(--primary);
+}
+
+.insight-card__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.insight-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.insight-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.insight-card__head h3 {
+  font-size: 0.95rem;
+}
+
+.insight-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.insight-card__message {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.insight-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.insight-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.insight-feedback--active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.insight-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .insight-search {
+    width: 100%;
+  }
+
+  .insight-search__input {
+    flex: 1;
+    width: auto;
+  }
+
+  .insight-card {
+    padding: 14px;
+  }
+}
+
+/* ==========================================================================
    Orçamentos
    ========================================================================== */
 

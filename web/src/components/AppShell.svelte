@@ -41,6 +41,7 @@
     { path: "/investments", label: "Investimentos", icon: "piggy" },
     { path: "/achievements", label: "Conquistas", icon: "trophy" },
     { path: "/notifications", label: "Notificações", icon: "bell" },
+    { path: "/insights", label: "Insights", icon: "sparkles" },
     { path: "/data", label: "Dados", icon: "database" },
     { path: "/family", label: "Família", icon: "users" },
     { path: "/settings", label: "Configurações", icon: "sliders" },
@@ -62,6 +63,7 @@
     "/investments": "Investimentos",
     "/achievements": "Conquistas",
     "/notifications": "Notificações",
+    "/insights": "Insights",
     "/data": "Dados",
     "/family": "Família",
   };

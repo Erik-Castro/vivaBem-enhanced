@@ -16,7 +16,6 @@ const RECENT_TTL_MS = 30_000;
 
 /**
  * Rotas de notificação que já têm tela equivalente no SPA.
- * `/insights` fica sem navegação até a tela ser entregue.
  */
 const KNOWN_ROUTES = new Set([
   "/dashboard",
@@ -29,6 +28,7 @@ const KNOWN_ROUTES = new Set([
   "/investments",
   "/achievements",
   "/notifications",
+  "/insights",
   "/data",
   "/family",
   "/settings",

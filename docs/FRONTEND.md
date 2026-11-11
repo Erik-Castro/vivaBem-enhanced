@@ -103,8 +103,8 @@ web/
                         # sino e painel de notificações
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
                         # Categories, Budgets, Goals, Habits, Investments,
-                        # Achievements, Notifications, Recurring, Data, Family,
-                        # Settings, ComingSoon, NotFound
+                        # Achievements, Notifications, Insights, Recurring,
+                        # Data, Family, Settings, ComingSoon, NotFound
 ```
 
 ### 4.1 Rotas
@@ -119,6 +119,7 @@ web/
 | `#/recurring` | sim | Recorrências, próximas ocorrências, execução, pausa e reativação |
 | `#/data` | sim | Importação de CSV/OFX com prévia e exportação JSON/CSV |
 | `#/family` | sim | Convite, aceite/recusa, vínculo ativo e resumo do parceiro |
+| `#/insights` | sim | Insights da IA, filtros, busca, leitura e feedback |
 | `#/categories` | sim | Árvore de categorias e subcategorias |
 | `#/budgets` | sim | Orçamentos por mês, progresso, alertas e ativação |
 | `#/goals` | sim | Metas por status, progresso e contribuições |
@@ -185,8 +186,8 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
   `backdrop-filter` dele cria um containing block para `position: fixed`.
 - Cada item marca como lida ao ser aberto e navega pelo link da API apenas
   quando a rota existe no SPA: `/finances` vira `/dashboard`, `/budgets/:id`
-  vira `/budgets` e `/settings/sessions` vira `/settings`; `/insights` fica
-  sem navegação até a tela existir (as demais já navegam).
+  vira `/budgets` e `/settings/sessions` vira `/settings`. Todas as rotas com
+  tela entregue já navegam; links desconhecidos apenas marcam a leitura.
 - A página `#/notifications` tem abas "Todas" e "Não lidas" (com badge),
   atualização manual, "Marcar todas como lidas", paginação e estados de vazio
   e erro.
@@ -232,6 +233,22 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
   de agregados é exibido; falha no resumo não derruba a tela.
 - Revogar vínculo e recusar convite pedem confirmação; o outro lado recebe
   notificação e o atalho `/family` do sino passa a navegar para esta tela.
+
+### 4.10 Insights
+
+- `Insights.svelte` lista `GET /insights` em páginas de 50 com "Carregar mais",
+  filtro por categoria, alternância "Somente não lidos" e o contador de não
+  lidos de `GET /insights/unread-count`.
+- A busca usa `GET /insights/search?q=` (similaridade com fallback textual),
+  mostra o resumo de resultados e mantém a lista original intacta para
+  "Limpar busca".
+- "Marcar como lida" usa `PATCH /insights/{id}/read`; "Marcar todas" usa
+  `POST /insights/read-all` e atualiza a lista local e o contador.
+- O feedback "Útil"/"Não útil" envia `POST /insights/{id}/feedback` com
+  `helpful`/`not_helpful` e destaca a escolha na sessão.
+- Quando `user.preferences.aiEnabled` é falso, um aviso explica como ativar a
+  IA sem esconder os insights já gerados. Severidades usam os mesmos badges do
+  restante da interface e a confiança é exibida em percentual.
 
 ---
 

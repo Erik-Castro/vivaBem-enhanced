@@ -7,6 +7,8 @@ import type {
   Habit,
   HabitFrequencyType,
   HabitType,
+  InsightCategory,
+  InsightSeverity,
   InvestmentOperationType,
   NotificationCategory,
   NotificationSeverity,
@@ -322,4 +324,43 @@ const notificationSeverityLabels: Readonly<Record<NotificationSeverity, string>>
 
 export function notificationSeverityLabel(severity: NotificationSeverity): string {
   return notificationSeverityLabels[severity];
+}
+
+export const insightCategoryOptions: readonly {
+  readonly value: InsightCategory;
+  readonly label: string;
+  readonly icon: IconName;
+}[] = [
+  { value: "finance", label: "Finanças", icon: "wallet" },
+  { value: "habit", label: "Hábitos", icon: "heart" },
+  { value: "security", label: "Segurança", icon: "lock" },
+  { value: "investment", label: "Investimentos", icon: "piggy" },
+  { value: "recommendation", label: "Recomendação", icon: "sparkles" },
+  { value: "family", label: "Família", icon: "users" },
+  { value: "correlation", label: "Correlação", icon: "chart" },
+];
+
+export function insightCategoryLabel(category: InsightCategory): string {
+  return (
+    insightCategoryOptions.find((option) => option.value === category)?.label ??
+    category
+  );
+}
+
+export function insightCategoryIcon(category: InsightCategory): IconName {
+  return (
+    insightCategoryOptions.find((option) => option.value === category)?.icon ??
+    "sparkles"
+  );
+}
+
+const insightSeverityLabels: Readonly<Record<InsightSeverity, string>> = {
+  low: "Baixa",
+  medium: "Média",
+  high: "Alta",
+  critical: "Crítica",
+};
+
+export function insightSeverityLabel(severity: InsightSeverity): string {
+  return insightSeverityLabels[severity];
 }

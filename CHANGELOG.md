@@ -9,6 +9,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
+- Tela de insights (`#/insights`) com filtros por categoria e leitura, busca
+  semântica com fallback textual, marcação de leitura (uma/todas), feedback
+  "útil"/"não útil", paginação e aviso quando a IA está desativada.
 - Tela de família (`#/family`) com convite por e-mail, aceite/recusa de
   convites recebidos, cancelamento de enviados e resumo agregado do parceiro
   (totais do mês por moeda e contagens), sem expor transações individuais.
