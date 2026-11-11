@@ -143,9 +143,9 @@ make web-build        # build de produção em web/dist
 cd web && npm run preview   # build em http://localhost:4173 (APP_ORIGIN igual)
 ```
 
-Telas entregues: login/cadastro, painel, contas, transações (com transferência) e categorias, além
-de configurações (perfil, preferências, sessões e tema). Orçamentos, metas, hábitos, investimentos e
-conquistas ainda são placeholders. Detalhes: [`docs/FRONTEND.md`](docs/FRONTEND.md).
+Telas entregues: login/cadastro, painel, contas, transações (com transferência), categorias,
+orçamentos, metas, hábitos, investimentos, conquistas e configurações (perfil, preferências, sessões
+e tema). Detalhes: [`docs/FRONTEND.md`](docs/FRONTEND.md).
 
 ## Autenticação
 
