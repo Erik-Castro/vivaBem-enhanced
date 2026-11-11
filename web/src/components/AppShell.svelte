@@ -32,6 +32,7 @@
   const mainNav: NavItem[] = [
     { path: "/dashboard", label: "Painel", icon: "dashboard" },
     { path: "/transactions", label: "Transações", icon: "arrows" },
+    { path: "/recurring", label: "Recorrências", icon: "repeat" },
     { path: "/accounts", label: "Contas", icon: "wallet" },
     { path: "/categories", label: "Categorias", icon: "tag" },
     { path: "/budgets", label: "Orçamentos", icon: "chart" },
@@ -49,6 +50,7 @@
   const titles: Record<string, string> = {
     "/dashboard": "Painel",
     "/transactions": "Transações",
+    "/recurring": "Recorrências",
     "/accounts": "Contas",
     "/categories": "Categorias",
     "/settings": "Configurações",

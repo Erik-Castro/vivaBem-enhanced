@@ -10,6 +10,8 @@ import type {
   InvestmentOperationType,
   NotificationCategory,
   NotificationSeverity,
+  RecurringFrequency,
+  RecurringType,
   TransactionType,
 } from "./types";
 
@@ -253,6 +255,35 @@ export function achievementCategoryIcon(category: AchievementCategory): IconName
     achievementCategoryOptions.find((option) => option.value === category)?.icon ??
     "trophy"
   );
+}
+
+export const recurringFrequencyOptions: readonly {
+  readonly value: RecurringFrequency;
+  readonly label: string;
+  readonly unitSingular: string;
+  readonly unitPlural: string;
+}[] = [
+  { value: "daily", label: "Diária", unitSingular: "dia", unitPlural: "dias" },
+  { value: "weekly", label: "Semanal", unitSingular: "semana", unitPlural: "semanas" },
+  { value: "monthly", label: "Mensal", unitSingular: "mês", unitPlural: "meses" },
+  { value: "yearly", label: "Anual", unitSingular: "ano", unitPlural: "anos" },
+];
+
+/** Ex.: `Mensal` ou `A cada 2 meses` quando o intervalo é maior que um. */
+export function recurringFrequencyLabel(
+  frequency: RecurringFrequency,
+  interval = 1,
+): string {
+  const option = recurringFrequencyOptions.find((entry) => entry.value === frequency);
+
+  if (!option) return frequency;
+  if (interval <= 1) return option.label;
+
+  return `A cada ${interval} ${option.unitPlural}`;
+}
+
+export function recurringTypeLabel(type: RecurringType): string {
+  return type === "income" ? "Receita" : "Despesa";
 }
 
 export const notificationCategoryOptions: readonly {

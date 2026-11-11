@@ -1367,6 +1367,62 @@ ol {
 }
 
 /* ==========================================================================
+   Recorrências
+   ========================================================================== */
+
+.toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.card-head--flush {
+  align-items: center;
+  margin-bottom: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.card-empty {
+  padding: 26px 18px;
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+.recurring-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.recurring-date__day {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.recurring-date__month {
+  color: var(--muted);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recurring-row--inactive {
+  opacity: 0.62;
+}
+
+/* ==========================================================================
    Orçamentos
    ========================================================================== */
 

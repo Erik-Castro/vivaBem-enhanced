@@ -375,6 +375,42 @@ export interface AchievementSummary {
   readonly points: number;
 }
 
+export type RecurringType = "income" | "expense";
+
+export type RecurringFrequency = "daily" | "weekly" | "monthly" | "yearly";
+
+export interface Recurring {
+  readonly id: string;
+  readonly accountId: string;
+  readonly accountName: string;
+  readonly categoryId: string | null;
+  readonly categoryName: string | null;
+  readonly type: RecurringType;
+  readonly amountMinor: number;
+  readonly currencyCode: string;
+  readonly description: string | null;
+  readonly frequency: RecurringFrequency;
+  readonly interval: number;
+  readonly dayOfMonth: number | null;
+  readonly startDate: string;
+  readonly endDate: string | null;
+  readonly nextOccurrence: string;
+  readonly isActive: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface UpcomingOccurrence {
+  readonly recurringId: string;
+  readonly accountId: string;
+  readonly categoryId: string | null;
+  readonly type: RecurringType;
+  readonly amountMinor: number;
+  readonly currencyCode: string;
+  readonly description: string | null;
+  readonly occurrenceDate: string;
+}
+
 export type NotificationCategory =
   | "finance"
   | "habit"

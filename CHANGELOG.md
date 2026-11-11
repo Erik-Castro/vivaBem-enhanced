@@ -9,6 +9,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
+- Tela de recorrências (`#/recurring`) com lista de ativas e pausadas,
+  projeção de próximas ocorrências (30/60/90 dias), criação, edição,
+  "Executar agora" e pausa/reativação sem apagar o histórico.
 - Sino de notificações no topbar com badge de não lidas (cap `9+`), painel com
   as 8 mais recentes (dropdown no desktop, bottom sheet no mobile), marcação
   de leitura ao abrir e atalho para a central.

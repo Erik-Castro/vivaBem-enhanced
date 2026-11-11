@@ -103,8 +103,8 @@ web/
                         # sino e painel de notificações
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
                         # Categories, Budgets, Goals, Habits, Investments,
-                        # Achievements, Notifications, Settings, ComingSoon,
-                        # NotFound
+                        # Achievements, Notifications, Recurring, Settings,
+                        # ComingSoon, NotFound
 ```
 
 ### 4.1 Rotas
@@ -116,6 +116,7 @@ web/
 | `#/dashboard` | sim | Resumo do mês, saldos e últimas transações |
 | `#/accounts` | sim | Contas, cartões, saldo e ativação |
 | `#/transactions` | sim | Lista, filtros, criação, edição, remoção, compensação e transferência |
+| `#/recurring` | sim | Recorrências, próximas ocorrências, execução, pausa e reativação |
 | `#/categories` | sim | Árvore de categorias e subcategorias |
 | `#/budgets` | sim | Orçamentos por mês, progresso, alertas e ativação |
 | `#/goals` | sim | Metas por status, progresso e contribuições |
@@ -187,6 +188,20 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
 - A página `#/notifications` tem abas "Todas" e "Não lidas" (com badge),
   atualização manual, "Marcar todas como lidas", paginação e estados de vazio
   e erro.
+
+### 4.7 Recorrências
+
+- `Recurring.svelte` combina a lista de recorrências com a projeção de
+  `GET /recurring/upcoming` (30, 60 ou 90 dias) e resolve o nome da conta no
+  cliente; a API devolve apenas `accountId` nas ocorrências.
+- A lista ordena ativas primeiro e depois pela próxima ocorrência; "Mostrar
+  pausadas" controla `includeInactive`. Ao pausar, o filtro é ligado
+  automaticamente para a linha continuar visível e permitir reativar.
+- "Executar agora" materializa a próxima ocorrência via `POST run-now` e
+  recarrega as duas listas; fica desabilitado quando a recorrência está pausada.
+- O formulário aceita apenas `income`/`expense`, exige conta ativa, deriva a
+  moeda da conta e mostra o dia do mês somente em frequências mensais/anuais.
+  O intervalo vai de 1 a 60 e a data final é opcional.
 
 ---
 

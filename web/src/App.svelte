@@ -17,6 +17,7 @@
   import Login from "./pages/Login.svelte";
   import NotFound from "./pages/NotFound.svelte";
   import Notifications from "./pages/Notifications.svelte";
+  import Recurring from "./pages/Recurring.svelte";
   import Register from "./pages/Register.svelte";
   import Settings from "./pages/Settings.svelte";
   import Transactions from "./pages/Transactions.svelte";
@@ -64,6 +65,8 @@
       <Accounts />
     {:else if router.path === "/transactions"}
       <Transactions />
+    {:else if router.path === "/recurring"}
+      <Recurring />
     {:else if router.path === "/categories"}
       <Categories />
     {:else if router.path === "/budgets"}
