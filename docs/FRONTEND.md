@@ -103,7 +103,7 @@ web/
                         # sino e painel de notificações
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
                         # Categories, Budgets, Goals, Habits, Investments,
-                        # Achievements, Notifications, Recurring, Data,
+                        # Achievements, Notifications, Recurring, Data, Family,
                         # Settings, ComingSoon, NotFound
 ```
 
@@ -118,6 +118,7 @@ web/
 | `#/transactions` | sim | Lista, filtros, criação, edição, remoção, compensação e transferência |
 | `#/recurring` | sim | Recorrências, próximas ocorrências, execução, pausa e reativação |
 | `#/data` | sim | Importação de CSV/OFX com prévia e exportação JSON/CSV |
+| `#/family` | sim | Convite, aceite/recusa, vínculo ativo e resumo do parceiro |
 | `#/categories` | sim | Árvore de categorias e subcategorias |
 | `#/budgets` | sim | Orçamentos por mês, progresso, alertas e ativação |
 | `#/goals` | sim | Metas por status, progresso e contribuições |
@@ -184,8 +185,8 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
   `backdrop-filter` dele cria um containing block para `position: fixed`.
 - Cada item marca como lida ao ser aberto e navega pelo link da API apenas
   quando a rota existe no SPA: `/finances` vira `/dashboard`, `/budgets/:id`
-  vira `/budgets` e `/settings/sessions` vira `/settings`; `/family` e
-  `/insights` ficam sem navegação até as telas correspondentes existirem.
+  vira `/budgets` e `/settings/sessions` vira `/settings`; `/insights` fica
+  sem navegação até a tela existir (as demais já navegam).
 - A página `#/notifications` tem abas "Todas" e "Não lidas" (com badge),
   atualização manual, "Marcar todas como lidas", paginação e estados de vazio
   e erro.
@@ -218,6 +219,19 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
   `Content-Disposition` devolvido pela API.
 - Os cards explicam o conteúdo de cada arquivo e deixam claro que senhas,
   tokens e embeddings nunca entram no backup.
+
+### 4.9 Família
+
+- `Family.svelte` lista convites recebidos, enviados e o vínculo ativo a partir
+  de `GET /family`; aceitar/recusar usam `POST /family/{id}/accept|reject` e
+  encerrar/cancelar usam `DELETE /family/{id}`.
+- O botão de convidar fica desabilitado enquanto existir qualquer convite
+  pendente ou vínculo ativo, porque a API permite apenas um por usuário.
+- Com vínculo ativo, `GET /family/summary` alimenta os totais do mês por moeda
+  (receitas, despesas, saldo e contagem) e as contagens do parceiro. Nada além
+  de agregados é exibido; falha no resumo não derruba a tela.
+- Revogar vínculo e recusar convite pedem confirmação; o outro lado recebe
+  notificação e o atalho `/family` do sino passa a navegar para esta tela.
 
 ---
 

@@ -1557,6 +1557,140 @@ ol {
 }
 
 /* ==========================================================================
+   Família
+   ========================================================================== */
+
+.family-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.family-link:last-child {
+  border-bottom: 0;
+}
+
+.family-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.family-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.family-period {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.family-period strong {
+  color: var(--ink);
+}
+
+.family-empty-period {
+  font-size: 0.84rem;
+}
+
+.family-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.family-total {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.family-total__currency {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.family-total__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.family-total__rows > div,
+.family-counts > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.family-total__rows dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.family-total__rows dd {
+  margin: 0;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.family-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.family-counts dt {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.family-counts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.family-summary-loading {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+@media (max-width: 720px) {
+  .family-link {
+    flex-wrap: wrap;
+  }
+
+  .family-actions {
+    width: 100%;
+  }
+
+  .family-actions .btn {
+    flex: 1;
+  }
+}
+
+/* ==========================================================================
    Orçamentos
    ========================================================================== */
 

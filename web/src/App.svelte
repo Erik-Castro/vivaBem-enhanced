@@ -11,6 +11,7 @@
   import ComingSoon from "./pages/ComingSoon.svelte";
   import Dashboard from "./pages/Dashboard.svelte";
   import Data from "./pages/Data.svelte";
+  import Family from "./pages/Family.svelte";
   import Goals from "./pages/Goals.svelte";
   import Habits from "./pages/Habits.svelte";
   import Investments from "./pages/Investments.svelte";
@@ -70,6 +71,8 @@
       <Recurring />
     {:else if router.path === "/data"}
       <Data />
+    {:else if router.path === "/family"}
+      <Family />
     {:else if router.path === "/categories"}
       <Categories />
     {:else if router.path === "/budgets"}

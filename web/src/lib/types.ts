@@ -453,6 +453,53 @@ export interface ImportResult {
   readonly errors: readonly ImportRowError[];
 }
 
+export type FamilyLinkStatus = "pending" | "accepted" | "rejected" | "revoked";
+
+export interface FamilyPartner {
+  readonly id: string;
+  readonly name: string;
+  readonly email: string;
+}
+
+export interface FamilyLink {
+  readonly id: string;
+  readonly status: FamilyLinkStatus;
+  readonly role: "requester" | "addressee";
+  readonly partner: FamilyPartner;
+  readonly createdAt: string;
+  readonly respondedAt: string | null;
+}
+
+export interface FamilyLinks {
+  readonly incoming: readonly FamilyLink[];
+  readonly outgoing: readonly FamilyLink[];
+  readonly active: readonly FamilyLink[];
+}
+
+export interface FamilyCurrencyTotal {
+  readonly currencyCode: string;
+  readonly incomeMinor: number;
+  readonly expenseMinor: number;
+  readonly transferNetMinor: number;
+  readonly netMinor: number;
+  readonly transactionCount: number;
+}
+
+export interface FamilyCounts {
+  readonly activeAccounts: number;
+  readonly activeHabits: number;
+  readonly habitLogs: number;
+  readonly activeGoals: number;
+  readonly unlockedAchievements: number;
+}
+
+export interface FamilySummary {
+  readonly partner: FamilyPartner;
+  readonly period: { readonly from: string; readonly to: string };
+  readonly totals: readonly FamilyCurrencyTotal[];
+  readonly counts: FamilyCounts;
+}
+
 export type NotificationCategory =
   | "finance"
   | "habit"

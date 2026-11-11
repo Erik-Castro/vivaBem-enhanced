@@ -9,6 +9,9 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
+- Tela de família (`#/family`) com convite por e-mail, aceite/recusa de
+  convites recebidos, cancelamento de enviados e resumo agregado do parceiro
+  (totais do mês por moeda e contagens), sem expor transações individuais.
 - Tela de dados (`#/data`) com importação de CSV/OFX (prévia de linhas
   novas/duplicadas, erros por linha e commit idempotente) e exportação do backup
   JSON completo ou das transações em CSV.

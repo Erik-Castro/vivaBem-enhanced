@@ -42,6 +42,7 @@
     { path: "/achievements", label: "Conquistas", icon: "trophy" },
     { path: "/notifications", label: "Notificações", icon: "bell" },
     { path: "/data", label: "Dados", icon: "database" },
+    { path: "/family", label: "Família", icon: "users" },
     { path: "/settings", label: "Configurações", icon: "sliders" },
   ];
 
@@ -62,6 +63,7 @@
     "/achievements": "Conquistas",
     "/notifications": "Notificações",
     "/data": "Dados",
+    "/family": "Família",
   };
 
   const mobilePaths = new Set([
