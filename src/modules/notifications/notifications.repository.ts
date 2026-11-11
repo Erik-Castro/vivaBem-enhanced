@@ -36,6 +36,14 @@ export interface CreateNotificationRecord {
   readonly severity: NotificationSeverity;
   readonly link: string | null;
   readonly now: string;
+  /** Chave de deduplicação do efeito (`id do evento: título`). */
+  readonly dedupeKey?: string | null;
+}
+
+export interface CreateNotificationResult {
+  readonly notification: Notification;
+  /** `false` quando a restrição única impediu uma notificação duplicada. */
+  readonly created: boolean;
 }
 
 export interface ListNotificationsOptions {
@@ -94,11 +102,13 @@ export class NotificationsRepository {
           NotificationSeverity,
           string | null,
           string,
+          string | null,
         ]
       >(
         `INSERT INTO notifications (
-           id, user_id, title, message, category, severity, link, is_read, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+           id, user_id, title, message, category, severity, link, is_read,
+           created_at, dedupe_key
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
       )
       .run(
         record.id,
@@ -109,8 +119,87 @@ export class NotificationsRepository {
         record.severity,
         record.link,
         record.now,
+        record.dedupeKey ?? null,
       );
 
+    return {
+      id: record.id,
+      userId: record.userId,
+      title: record.title,
+      message: record.message,
+      category: record.category,
+      severity: record.severity,
+      link: record.link,
+      isRead: false,
+      createdAt: record.now,
+    };
+  }
+
+  /**
+   * Cria a notificação se a chave de deduplicação ainda não existir.
+   *
+   * A restrição UNIQUE cobre o replay do mesmo evento; notificações sem chave
+   * (conquistas, família) mantêm o comportamento anterior.
+   */
+  createIfAbsent(record: CreateNotificationRecord): CreateNotificationResult {
+    const changes = this.#db
+      .prepare<
+        [
+          string,
+          string,
+          string,
+          string,
+          NotificationCategory,
+          NotificationSeverity,
+          string | null,
+          string,
+          string | null,
+        ]
+      >(
+        `INSERT INTO notifications (
+           id, user_id, title, message, category, severity, link, is_read,
+           created_at, dedupe_key
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+         ON CONFLICT DO NOTHING`,
+      )
+      .run(
+        record.id,
+        record.userId,
+        record.title,
+        record.message,
+        record.category,
+        record.severity,
+        record.link,
+        record.now,
+        record.dedupeKey ?? null,
+      ).changes;
+
+    if (changes === 1) {
+      return {
+        notification: this.createView(record),
+        created: true,
+      };
+    }
+
+    const key = record.dedupeKey ?? null;
+    if (key === null) {
+      throw new Error("notificação não persistida");
+    }
+
+    const row = this.#db
+      .prepare<[string, string], NotificationRow>(
+        "SELECT * FROM notifications WHERE user_id = ? AND dedupe_key = ?",
+      )
+      .get(record.userId, key);
+
+    if (row === undefined) {
+      throw new Error("notificação duplicada sem registro correspondente");
+    }
+
+    return { notification: toNotification(row), created: false };
+  }
+
+  private createView(record: CreateNotificationRecord): Notification {
     return {
       id: record.id,
       userId: record.userId,

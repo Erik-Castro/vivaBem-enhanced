@@ -1,4 +1,4 @@
-import type { AppConfig } from "../config.ts";
+import type { AiConfigSource } from "../config.ts";
 import type { AppDatabase } from "../db/client.ts";
 import type { Logger } from "../shared/logger/index.ts";
 import type { EventPublisher } from "../events/event-publisher.ts";
@@ -14,7 +14,7 @@ export interface AiExecutionSummary {
 
 export interface AiToolExecutorDependencies {
   readonly db: AppDatabase;
-  readonly config: AppConfig;
+  readonly config: AiConfigSource;
   readonly logger: Logger;
   readonly registry: AiToolRegistry;
   readonly publisher: EventPublisher;
@@ -46,7 +46,7 @@ const HIGH_RISK_MIN_CONFIDENCE = 0.9;
  */
 export class AiToolExecutor {
   readonly #db: AppDatabase;
-  readonly #config: AppConfig;
+  readonly #config: AiConfigSource;
   readonly #logger: Logger;
   readonly #registry: AiToolRegistry;
   readonly #publisher: EventPublisher;

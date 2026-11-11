@@ -41,6 +41,17 @@ export interface CreateInsightRecord {
   readonly sourceEvent: string | null;
   readonly confidence: number;
   readonly now: string;
+  /**
+   * Chave de deduplicação do efeito (`id do evento: título`). Quando presente,
+   * reprocessar o mesmo evento não cria outro insight.
+   */
+  readonly dedupeKey?: string | null;
+}
+
+export interface CreateInsightResult {
+  readonly insight: AiInsight;
+  /** `false` quando a restrição única impediu a criação de uma duplicata. */
+  readonly created: boolean;
 }
 
 export interface ListInsightsOptions {
@@ -146,12 +157,13 @@ export class InsightsRepository {
           string | null,
           number,
           string,
+          string | null,
         ]
       >(
         `INSERT INTO ai_insights (
            id, user_id, category, severity, title, message, source_event,
-           confidence, is_read, created_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+           confidence, is_read, created_at, dedupe_key
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
       )
       .run(
         record.id,
@@ -163,6 +175,7 @@ export class InsightsRepository {
         record.sourceEvent,
         record.confidence,
         record.now,
+        record.dedupeKey ?? null,
       );
 
     return {
@@ -177,6 +190,83 @@ export class InsightsRepository {
       isRead: false,
       createdAt: record.now,
     };
+  }
+
+  /**
+   * Cria o insight se a chave de deduplicação ainda não existir.
+   *
+   * A garantia é a restrição UNIQUE no banco: uma checagem prévia em código não
+   * resiste a dois workers processando o mesmo evento ao mesmo tempo.
+   */
+  createIfAbsent(record: CreateInsightRecord): CreateInsightResult {
+    const changes = this.#db
+      .prepare<
+        [
+          string,
+          string,
+          InsightCategory,
+          InsightSeverity,
+          string,
+          string,
+          string | null,
+          number,
+          string,
+          string | null,
+        ]
+      >(
+        `INSERT INTO ai_insights (
+           id, user_id, category, severity, title, message, source_event,
+           confidence, is_read, created_at, dedupe_key
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+         ON CONFLICT DO NOTHING`,
+      )
+      .run(
+        record.id,
+        record.userId,
+        record.category,
+        record.severity,
+        record.title,
+        record.message,
+        record.sourceEvent,
+        record.confidence,
+        record.now,
+        record.dedupeKey ?? null,
+      ).changes;
+
+    if (changes === 1) {
+      return {
+        insight: {
+          id: record.id,
+          userId: record.userId,
+          category: record.category,
+          severity: record.severity,
+          title: record.title,
+          message: record.message,
+          sourceEvent: record.sourceEvent,
+          confidence: record.confidence,
+          isRead: false,
+          createdAt: record.now,
+        },
+        created: true,
+      };
+    }
+
+    const key = record.dedupeKey ?? null;
+    if (key === null) {
+      throw new Error("insight não persistido");
+    }
+
+    const row = this.#db
+      .prepare<[string, string], InsightRow>(
+        "SELECT * FROM ai_insights WHERE user_id = ? AND dedupe_key = ?",
+      )
+      .get(record.userId, key);
+
+    if (row === undefined) {
+      throw new Error("insight duplicado sem registro correspondente");
+    }
+
+    return { insight: toInsight(row), created: false };
   }
 
   list(userId: string, options: ListInsightsOptions): InsightPage {

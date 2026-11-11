@@ -1,6 +1,7 @@
-import type { AppConfig } from "../config.ts";
+import type { AiConfigSource } from "../config.ts";
 import type { Logger } from "../shared/logger/index.ts";
 import type { OutboxEvent } from "../events/events.types.ts";
+import { requireEventDescriptor, validateEventPayload } from "../events/event-registry.ts";
 import type { AiContextRegistry } from "./ai.context.ts";
 import type { AiProvider } from "./ai.types.ts";
 import type { AiToolExecutor } from "./ai.executor.ts";
@@ -10,7 +11,7 @@ import { getPromptForEvent } from "./ai.prompts.ts";
 import { redactForProvider } from "./ai.redaction.ts";
 
 export interface AiProcessorDependencies {
-  readonly config: AppConfig;
+  readonly config: AiConfigSource;
   readonly logger: Logger;
   readonly provider: AiProvider;
   readonly contexts: AiContextRegistry;
@@ -33,7 +34,7 @@ export interface AiProcessingResult {
  * resposta e delegar a execução ao executor auditado.
  */
 export class AiProcessor {
-  readonly #config: AppConfig;
+  readonly #config: AiConfigSource;
   readonly #logger: Logger;
   readonly #provider: AiProvider;
   readonly #contexts: AiContextRegistry;
@@ -52,7 +53,10 @@ export class AiProcessor {
   }
 
   async process(event: OutboxEvent): Promise<AiProcessingResult> {
-    if (event.type === "embedding.requested") {
+    const descriptor = requireEventDescriptor(event.type);
+    validateEventPayload(event);
+
+    if (descriptor.pipeline === "embedding") {
       await this.#embeddings.processRequest(event);
       return { processed: true, toolCalls: 0, executed: 0 };
     }

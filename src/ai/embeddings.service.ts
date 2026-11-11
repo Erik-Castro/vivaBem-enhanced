@@ -4,6 +4,7 @@ import { sha256Hex } from "../shared/crypto/tokens.ts";
 import { uuidv7 } from "../shared/utils/uuid.ts";
 import type { OutboxEvent } from "../events/events.types.ts";
 import { EMBEDDING_SOURCE_TYPES, type EmbeddingSourceType } from "../events/events.types.ts";
+import { EventPayloadError } from "../events/errors.ts";
 import type { AiProvider } from "./ai.types.ts";
 import { EmbeddingsRepository } from "./embeddings.repository.ts";
 
@@ -58,7 +59,7 @@ export class EmbeddingsService {
       typeof content !== "string" ||
       content.trim() === ""
     ) {
-      throw new Error("Evento de embedding com payload inválido");
+      throw new EventPayloadError("Evento de embedding com payload inválido");
     }
 
     const [vector] = await this.#provider.embed([content.slice(0, 20_000)]);

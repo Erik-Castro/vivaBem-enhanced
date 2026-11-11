@@ -32,15 +32,15 @@ export interface CreateInsightInput {
 /**
  * Cria um insight e devolve o conteúdo para indexação assíncrona.
  *
- * A deduplicação de título fica a cargo do executor (mesma tool + argumentos
- * dentro da janela) para não bloquear insights legítimos com texto parecido.
+ * A deduplicação é feita no banco por `dedupe_key` (id do evento + título):
+ * reprocessar o mesmo evento não cria outro insight nem reindexa o conteúdo.
  */
 export function createInsight(
   dependencies: AiToolDependencies,
   context: AiToolContext,
   input: CreateInsightInput,
 ): AiToolResult {
-  const insight = dependencies.insights.create({
+  const { insight, created } = dependencies.insights.createIfAbsent({
     id: uuidv7(),
     userId: context.userId,
     category: input.category,
@@ -50,7 +50,16 @@ export function createInsight(
     sourceEvent: context.sourceEvent,
     confidence: context.confidence,
     now: context.now,
+    dedupeKey: `${context.eventId}:${input.title}`,
   });
+
+  if (!created) {
+    return {
+      success: true,
+      message: "Insight já existente",
+      data: { id: insight.id, deduplicated: true },
+    };
+  }
 
   return {
     success: true,
@@ -73,25 +82,17 @@ export interface NotifyInput {
 }
 
 /**
- * Notifica o usuário com deduplicação por título.
+ * Notifica o usuário com deduplicação por evento.
  *
- * Notificação duplicada é pior que notificação ausente: o worker pode reprocessar
- * um evento após falha parcial, e o usuário não deve ver o mesmo aviso duas vezes.
+ * A chave inclui o id do evento: reprocessar a mesma entrega não cria outro
+ * aviso, mas eventos distintos com o mesmo texto continuam gerando notificação.
  */
 export function notify(
   dependencies: AiToolDependencies,
   context: AiToolContext,
   input: NotifyInput,
 ): AiToolResult {
-  if (dependencies.notifications.hasByTitle(context.userId, input.title)) {
-    return {
-      success: true,
-      message: "Notificação já existente",
-      data: { deduplicated: true },
-    };
-  }
-
-  const notification = dependencies.notifications.create({
+  const { notification, created } = dependencies.notifications.createIfAbsent({
     id: uuidv7(),
     userId: context.userId,
     title: input.title,
@@ -100,7 +101,16 @@ export function notify(
     severity: input.severity,
     link: input.link ?? null,
     now: context.now,
+    dedupeKey: `${context.eventId}:${input.title}`,
   });
+
+  if (!created) {
+    return {
+      success: true,
+      message: "Notificação já existente",
+      data: { id: notification.id, deduplicated: true },
+    };
+  }
 
   return {
     success: true,
