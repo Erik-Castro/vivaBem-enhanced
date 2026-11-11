@@ -1,9 +1,11 @@
 import type { User } from "./types";
+import { enqueueMutation, listPending, removeFromQueue, pendingCount } from "./offline-queue";
 
 const API_BASE = "/api/v1";
 const CSRF_COOKIE = "vb_csrf";
 const CSRF_HEADER = "X-CSRF-Token";
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const IDEMPOTENCY_HEADER = "Idempotency-Key";
 
 export interface ApiMeta {
   readonly requestId?: string;
@@ -28,6 +30,8 @@ export interface RequestOptions {
   /** `false` impede a tentativa automática de refresh em respostas 401. */
   readonly retry?: boolean;
   readonly signal?: AbortSignal;
+  /** Suprime o enfileiramento offline (usa quando já está sendo tratado). */
+  readonly noOfflineQueue?: boolean;
 }
 
 interface ErrorShape {
@@ -67,6 +71,8 @@ let authHooks: AuthHooks = {};
 let csrfMemory: string | null = null;
 let csrfPromise: Promise<string> | null = null;
 let refreshPromise: Promise<boolean> | null = null;
+let isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+let replaying = false;
 
 /** Liga o cliente HTTP ao store de autenticação sem criar dependência circular. */
 export function setAuthHooks(hooks: AuthHooks): void {
@@ -76,6 +82,80 @@ export function setAuthHooks(hooks: AuthHooks): void {
 export function setCsrfToken(token: string): void {
   csrfMemory = token;
 }
+
+export function isOffline(): boolean {
+  return !isOnline;
+}
+
+export async function pendingMutationsCount(): Promise<number> {
+  return pendingCount();
+}
+
+/**
+ * Reexecute as mutações enfileiradas enquanto estava offline.
+ * Deve ser chamado quando a conexão retorna.
+ */
+export async function replayQueue(): Promise<void> {
+  if (replaying || isOffline()) return;
+  replaying = true;
+
+  try {
+    const pending = await listPending();
+
+    for (const entry of pending) {
+      try {
+        const headers: Record<string, string> = {
+          Accept: "application/json",
+          [IDEMPOTENCY_HEADER]: entry.key,
+          [CSRF_HEADER]: await ensureCsrfToken(),
+        };
+
+        if (entry.body !== null) {
+          headers["Content-Type"] = "application/json";
+        }
+
+        const response = await fetch(
+          `${API_BASE}${entry.path}`,
+          {
+            method: entry.method,
+            credentials: "include",
+            headers,
+            body: entry.body,
+          },
+        );
+
+        if (response.ok || response.status === 409) {
+          // 409 pode ser "conflito" mas a operação já pode ter sido aplicada
+          // (idempotência no servidor deve lidar com isso).
+          await removeFromQueue(entry.id);
+        } else {
+          // Mantém na fila para tentar novamente depois
+          break;
+        }
+      } catch {
+        // Falha de rede durante replay: para e tenta de novo depois
+        break;
+      }
+    }
+  } finally {
+    replaying = false;
+  }
+}
+
+function setupOnlineListener(): void {
+  if (typeof window === "undefined") return;
+
+  window.addEventListener("online", () => {
+    isOnline = true;
+    void replayQueue();
+  });
+
+  window.addEventListener("offline", () => {
+    isOnline = false;
+  });
+}
+
+setupOnlineListener();
 
 function getCookie(name: string): string | null {
   const prefix = `${name}=`;
@@ -178,8 +258,23 @@ export async function apiRequest<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  if (MUTATING_METHODS.has(method)) {
+  const isMutating = MUTATING_METHODS.has(method);
+  let idempotencyKey: string | undefined;
+
+  if (isMutating) {
     headers[CSRF_HEADER] = await ensureCsrfToken();
+    idempotencyKey = crypto.randomUUID();
+    headers[IDEMPOTENCY_HEADER] = idempotencyKey;
+  }
+
+  // Se estiver offline e for uma mutação, enfileira e retorna um envelope
+  // simulado. A UI deve tratar isso como "pendente" e sincronizar depois.
+  if (isOffline() && isMutating && idempotencyKey !== undefined && !options.noOfflineQueue) {
+    await enqueueMutation(idempotencyKey, method, path, options.body);
+    return {
+      data: undefined as T,
+      meta: { requestId: "offline-queued" },
+    };
   }
 
   let response: Response;
@@ -194,6 +289,11 @@ export async function apiRequest<T>(
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
+
+    // Falha de rede: se for mutação e não desabilitou fila offline, enfileira.
+    if (isMutating && idempotencyKey !== undefined && !options.noOfflineQueue) {
+      await enqueueMutation(idempotencyKey, method, path, options.body);
+    }
 
     throw new ApiError(0, {
       error: { code: "NETWORK_ERROR", message: "Sem conexão com o servidor" },

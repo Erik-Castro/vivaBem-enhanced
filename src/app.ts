@@ -9,6 +9,7 @@ import { AppError } from "./http/errors.ts";
 import { toErrorResponse } from "./http/error-handler.ts";
 import type { AppEnv } from "./http/types.ts";
 import { healthRoute, readyRoute, registerOpenApiDocument } from "./http/openapi.ts";
+import { idempotency } from "./http/middleware/idempotency.ts";
 import { requestId } from "./http/middleware/request-id.ts";
 import { requestLogger } from "./http/middleware/request-logger.ts";
 import { bodyLimit } from "./http/middleware/body-limit.ts";
@@ -276,6 +277,11 @@ export function createApp({
   app.use("/api/v1/export/*", requireAuth(repository, config));
   app.use("/api/v1/family", requireAuth(repository, config));
   app.use("/api/v1/family/*", requireAuth(repository, config));
+
+  // Idempotência de escritas: requer userId (já definido pelo requireAuth).
+  // Aplica-se a rotas autenticadas; o middleware ignora requisições sem o
+  // cabeçalho Idempotency-Key, então é seguro para todas as rotas autenticadas.
+  app.use("/api/v1/*", idempotency(db));
 
   // Registrado depois dos guards: quando `next()` retorna, `userId` já existe.
   app.use("*", evaluateAchievementsAfterMutation(achievementsService, logger));
