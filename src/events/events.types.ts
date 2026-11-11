@@ -31,7 +31,18 @@ export const EVENT_TYPES = [
 
 export type EventType = (typeof EVENT_TYPES)[number];
 
-export const EVENT_STATUSES = ["pending", "processing", "completed", "failed"] as const;
+/**
+ * `failed` é legado: existia antes do worker independente e continua aceito
+ * apenas para que uma imagem antiga (rollback) possa gravar falhas. Código novo
+ * usa sempre `dead_letter`.
+ */
+export const EVENT_STATUSES = [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+  "dead_letter",
+] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 
 /** Payload é JSON livre, mas sempre um objeto — nunca array ou escalar. */
@@ -62,9 +73,24 @@ export interface OutboxEvent {
   readonly availableAt: string;
   readonly lockedAt: string | null;
   readonly workerId: string | null;
+  readonly leaseToken: string | null;
+  readonly leaseExpiresAt: string | null;
   readonly lastError: string | null;
   readonly createdAt: string;
   readonly processedAt: string | null;
+  readonly replayCount: number;
+  readonly replayedAt: string | null;
+}
+
+/**
+ * Evento adquirido por este worker. Os campos de lease são obrigatórios: sem
+ * eles não é possível confirmar ou renovar a concessão.
+ */
+export interface ClaimedEvent extends OutboxEvent {
+  readonly status: "processing";
+  readonly workerId: string;
+  readonly leaseToken: string;
+  readonly leaseExpiresAt: string;
 }
 
 export interface PublishEventInput {
@@ -82,7 +108,17 @@ export interface OutboxStats {
   readonly pending: number;
   readonly processing: number;
   readonly completed: number;
+  /** Falhas legadas gravadas por uma imagem anterior à extração do worker. */
   readonly failed: number;
+  readonly deadLetter: number;
+}
+
+/** Resultado da confirmação de falha de um evento. */
+export type FailureOutcome = "retry" | "dead_letter" | "lost";
+
+export interface RecoveryResult {
+  readonly retried: number;
+  readonly deadLettered: number;
 }
 
 export function isEventType(value: string): value is EventType {

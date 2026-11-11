@@ -1,4 +1,4 @@
-import type { AppConfig } from "../config.ts";
+import type { AiConfigSource } from "../config.ts";
 import type { AppDatabase } from "../db/client.ts";
 import type { Logger } from "../shared/logger/index.ts";
 import { uuidv7 } from "../shared/utils/uuid.ts";
@@ -7,7 +7,7 @@ import { OutboxRepository } from "./outbox.repository.ts";
 
 export interface EventPublisherDependencies {
   readonly db: AppDatabase;
-  readonly config: AppConfig;
+  readonly config: AiConfigSource;
   readonly logger: Logger;
   readonly now?: () => Date;
   readonly repository?: OutboxRepository;
@@ -22,7 +22,7 @@ export interface EventPublisherDependencies {
  */
 export class EventPublisher {
   readonly #db: AppDatabase;
-  readonly #config: AppConfig;
+  readonly #config: AiConfigSource;
   readonly #logger: Logger;
   readonly #now: () => Date;
   readonly #repository: OutboxRepository;

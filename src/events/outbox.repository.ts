@@ -1,11 +1,15 @@
 import type { AppDatabase } from "../db/client.ts";
+import { generateOpaqueToken } from "../shared/crypto/tokens.ts";
 import {
+  type ClaimedEvent,
   type EventPayload,
   type EventStatus,
   type EventType,
+  type FailureOutcome,
   type OutboxEvent,
   type OutboxStats,
   parseEventPayload,
+  type RecoveryResult,
 } from "./events.types.ts";
 
 export interface InsertOutboxRecord {
@@ -20,6 +24,40 @@ export interface InsertOutboxRecord {
   readonly now: string;
 }
 
+export interface ClaimRequest {
+  readonly workerId: string;
+  /** Instante atual em ISO-8601 UTC. */
+  readonly now: string;
+  /** Validade da concessão em milissegundos. */
+  readonly leaseMs: number;
+}
+
+export interface FailRequest {
+  readonly error: string;
+  readonly now: string;
+  /** Quando o evento volta para a fila (retry transitório). */
+  readonly nextAvailableAt: string;
+  readonly maxAttempts: number;
+  /** Falha permanente vai direto para dead letter, sem retry. */
+  readonly permanent?: boolean;
+}
+
+export interface RecoveryRequest {
+  readonly now: string;
+  readonly maxAttempts: number;
+  /** Lease considerado para linhas legadas sem `lease_expires_at`. */
+  readonly leaseMs: number;
+}
+
+export type ReplayOutcome =
+  | "replayed"
+  | "not_found"
+  | "processing"
+  | "not_replayable";
+
+/** Estados terminais que podem ser reenfileirados manualmente. */
+const REPLAYABLE_STATUSES: readonly EventStatus[] = ["dead_letter", "failed"];
+
 interface OutboxRow {
   id: string;
   type: EventType;
@@ -33,9 +71,13 @@ interface OutboxRow {
   available_at: string;
   locked_at: string | null;
   worker_id: string | null;
+  lease_token: string | null;
+  lease_expires_at: string | null;
   last_error: string | null;
   created_at: string;
   processed_at: string | null;
+  replay_count: number;
+  replayed_at: string | null;
 }
 
 function toEvent(row: OutboxRow): OutboxEvent {
@@ -52,17 +94,50 @@ function toEvent(row: OutboxRow): OutboxEvent {
     availableAt: row.available_at,
     lockedAt: row.locked_at,
     workerId: row.worker_id,
+    leaseToken: row.lease_token,
+    leaseExpiresAt: row.lease_expires_at,
     lastError: row.last_error,
     createdAt: row.created_at,
     processedAt: row.processed_at,
+    replayCount: row.replay_count,
+    replayedAt: row.replayed_at,
   };
+}
+
+function toClaimed(row: OutboxRow): ClaimedEvent {
+  const event = toEvent(row);
+  // O claim só devolve linhas recém-adquiridas, então os campos de lease
+  // existem; o guarda mantém o tipo honesto se o schema regredir.
+  if (
+    event.workerId === null ||
+    event.leaseToken === null ||
+    event.leaseExpiresAt === null
+  ) {
+    throw new Error("claim sem worker_id/lease_token/lease_expires_at");
+  }
+  return {
+    ...event,
+    status: "processing",
+    workerId: event.workerId,
+    leaseToken: event.leaseToken,
+    leaseExpiresAt: event.leaseExpiresAt,
+  };
+}
+
+/** Instante de expiração do lease a partir de `now` e `leaseMs`. */
+function leaseExpiration(now: string, leaseMs: number): string {
+  return new Date(new Date(now).getTime() + leaseMs).toISOString();
 }
 
 /**
  * Fila transacional de eventos.
  *
- * `insert` é chamado dentro da transação da regra de negócio; o claim usa um
- * único `UPDATE ... RETURNING`, atômico mesmo com mais de um worker.
+ * `insert` é chamado dentro da transação da regra de negócio. O claim usa um
+ * único `UPDATE ... RETURNING`, atômico mesmo com vários workers, e grava um
+ * `lease_token` novo a cada aquisição. Confirmação, renovação e falha só
+ * afetam a linha se `status`, `worker_id` e `lease_token` ainda forem os da
+ * concessão corrente — uma instância que perdeu o lease não consegue
+ * sobrescrever o evento recuperado por outra.
  */
 export class OutboxRepository {
   constructor(private readonly db: AppDatabase) {}
@@ -100,11 +175,22 @@ export class OutboxRepository {
       );
   }
 
-  claimNext(workerId: string, now: string): OutboxEvent | null {
+  /**
+   * Adquire o próximo evento disponível.
+   *
+   * A transação é a própria instrução: nenhuma chamada externa acontece com o
+   * lock de escrita aberto. `attempts` é incrementado na aquisição, então o
+   * total de tentativas inclui a execução corrente.
+   */
+  claimNext(request: ClaimRequest): ClaimedEvent | null {
+    const leaseToken = generateOpaqueToken(32);
+    const leaseExpiresAt = leaseExpiration(request.now, request.leaseMs);
+
     const row = this.db
-      .prepare<[string, string, string], OutboxRow>(
+      .prepare<[string, string, string, string, string], OutboxRow>(
         `UPDATE event_outbox
-         SET status = 'processing', locked_at = ?, worker_id = ?, attempts = attempts + 1
+         SET status = 'processing', locked_at = ?, worker_id = ?,
+             lease_token = ?, lease_expires_at = ?, attempts = attempts + 1
          WHERE id = (
            SELECT id FROM event_outbox
            WHERE status = 'pending' AND available_at <= ?
@@ -113,82 +199,133 @@ export class OutboxRepository {
          )
          RETURNING *`,
       )
-      .get(now, workerId, now);
+      .get(request.now, request.workerId, leaseToken, leaseExpiresAt, request.now);
 
-    return row === undefined ? null : toEvent(row);
-  }
-
-  complete(eventId: string, now: string): void {
-    this.db
-      .prepare<[string, string]>(
-        `UPDATE event_outbox
-         SET status = 'completed', processed_at = ?, locked_at = NULL, worker_id = NULL
-         WHERE id = ?`,
-      )
-      .run(now, eventId);
+    return row === undefined ? null : toClaimed(row);
   }
 
   /**
-   * Registra a falha e decide entre retry com backoff e dead-letter.
-   * `attempts` já foi incrementado no claim, então o limite é o total de
-   * tentativas permitidas. Retorna `true` quando o evento voltou para a fila.
+   * Estende a concessão enquanto o processamento continua.
+   *
+   * Retorna `false` quando o evento já não pertence mais a esta concessão; o
+   * chamador deve descartar o resultado em vez de confirmar.
    */
-  fail(
-    event: OutboxEvent,
-    error: string,
+  renewLease(
+    eventId: string,
+    workerId: string,
+    leaseToken: string,
     now: string,
-    nextAvailableAt: string,
-    maxAttempts: number,
+    leaseMs: number,
   ): boolean {
-    const willRetry = event.attempts < maxAttempts;
+    const changes = this.db
+      .prepare<[string, string, string, string]>(
+        `UPDATE event_outbox
+         SET lease_expires_at = ?
+         WHERE id = ? AND status = 'processing' AND worker_id = ? AND lease_token = ?`,
+      )
+      .run(leaseExpiration(now, leaseMs), eventId, workerId, leaseToken).changes;
 
-    if (willRetry) {
-      this.db
-        .prepare<[string, string, string]>(
+    return changes === 1;
+  }
+
+  /** Confirma o processamento; stale leases não alteram a linha. */
+  complete(
+    eventId: string,
+    workerId: string,
+    leaseToken: string,
+    now: string,
+  ): boolean {
+    const changes = this.db
+      .prepare<[string, string, string, string]>(
+        `UPDATE event_outbox
+         SET status = 'completed', processed_at = ?, locked_at = NULL,
+             worker_id = NULL, lease_token = NULL, lease_expires_at = NULL
+         WHERE id = ? AND status = 'processing' AND worker_id = ? AND lease_token = ?`,
+      )
+      .run(now, eventId, workerId, leaseToken).changes;
+
+    return changes === 1;
+  }
+
+  /**
+   * Libera o evento após falha.
+   *
+   * Falha permanente ou tentativas esgotadas vão para `dead_letter`; as demais
+   * voltam para `pending` com o próximo `available_at` já calculado pelo
+   * backoff. Retorna `lost` quando a concessão não é mais deste worker.
+   */
+  fail(event: ClaimedEvent, request: FailRequest): FailureOutcome {
+    const deadLetter = request.permanent === true ||
+      event.attempts >= request.maxAttempts;
+    const error = request.error.slice(0, 1_000);
+
+    const changes = deadLetter
+      ? this.db
+        .prepare<[string, string, string, string, string]>(
+          `UPDATE event_outbox
+           SET status = 'dead_letter', last_error = ?, processed_at = ?,
+               locked_at = NULL, worker_id = NULL, lease_token = NULL,
+               lease_expires_at = NULL
+           WHERE id = ? AND status = 'processing' AND worker_id = ? AND lease_token = ?`,
+        )
+        .run(error, request.now, event.id, event.workerId, event.leaseToken).changes
+      : this.db
+        .prepare<[string, string, string, string, string]>(
           `UPDATE event_outbox
            SET status = 'pending', available_at = ?, last_error = ?,
-               locked_at = NULL, worker_id = NULL
-           WHERE id = ?`,
+               locked_at = NULL, worker_id = NULL, lease_token = NULL,
+               lease_expires_at = NULL
+           WHERE id = ? AND status = 'processing' AND worker_id = ? AND lease_token = ?`,
         )
-        .run(nextAvailableAt, error.slice(0, 1_000), event.id);
-    } else {
-      this.db
-        .prepare<[string, string, string]>(
-          `UPDATE event_outbox
-           SET status = 'failed', last_error = ?, processed_at = ?,
-               locked_at = NULL, worker_id = NULL
-           WHERE id = ?`,
-        )
-        .run(error.slice(0, 1_000), now, event.id);
-    }
+        .run(
+          request.nextAvailableAt,
+          error,
+          event.id,
+          event.workerId,
+          event.leaseToken,
+        ).changes;
 
-    return willRetry;
+    if (changes === 0) return "lost";
+    return deadLetter ? "dead_letter" : "retry";
   }
 
   /**
-   * Devolve leases vencidos para a fila. Eventos que já esgotaram as tentativas
-   * vão direto para dead-letter para não ficarem em loop.
+   * Recupera eventos cujo lease venceu.
+   *
+   * Linhas legadas (gravadas por uma imagem anterior, sem `lease_token`) usam
+   * `locked_at` como referência para permitir rollback sem perder eventos.
    */
-  recoverStuck(cutoff: string, now: string, maxAttempts: number): number {
-    const failed = this.db
-      .prepare<[string, string, number]>(
+  recoverExpired(request: RecoveryRequest): RecoveryResult {
+    const legacyCutoff = new Date(
+      new Date(request.now).getTime() - request.leaseMs,
+    ).toISOString();
+
+    const expiredCondition = `status = 'processing' AND (
+      (lease_expires_at IS NOT NULL AND lease_expires_at < ?)
+      OR (lease_token IS NULL AND locked_at < ?)
+    )`;
+
+    const deadLettered = this.db
+      .prepare<[string, number, string, string]>(
         `UPDATE event_outbox
-         SET status = 'failed', last_error = 'lease expirado', processed_at = ?,
-             locked_at = NULL, worker_id = NULL
-         WHERE status = 'processing' AND locked_at < ? AND attempts >= ?`,
+         SET status = 'dead_letter', last_error = 'lease expirado',
+             processed_at = ?, locked_at = NULL, worker_id = NULL,
+             lease_token = NULL, lease_expires_at = NULL
+         WHERE attempts >= ? AND ${expiredCondition}`,
       )
-      .run(now, cutoff, maxAttempts).changes;
+      .run(request.now, request.maxAttempts, request.now, legacyCutoff).changes;
 
     const retried = this.db
-      .prepare<[string, string, number]>(
+      .prepare<[string, number, string, string]>(
         `UPDATE event_outbox
          SET status = 'pending', available_at = ?, last_error = 'lease expirado',
-             locked_at = NULL, worker_id = NULL
-         WHERE status = 'processing' AND locked_at < ? AND attempts < ?`,
+             locked_at = NULL, worker_id = NULL, lease_token = NULL,
+             lease_expires_at = NULL
+         WHERE attempts < ? AND ${expiredCondition}`,
       )
-      .run(now, cutoff, maxAttempts).changes;
+      .run(request.now, request.maxAttempts, request.now, legacyCutoff).changes;
 
-    return failed + retried;
+    return { retried, deadLettered };
   }
 
   findById(eventId: string): OutboxEvent | null {
@@ -198,6 +335,20 @@ export class OutboxRepository {
     return row === undefined ? null : toEvent(row);
   }
 
+  listByStatus(statuses: readonly EventStatus[], limit: number): OutboxEvent[] {
+    if (statuses.length === 0) return [];
+    const placeholders = statuses.map(() => "?").join(", ");
+    return this.db
+      .prepare<unknown[], OutboxRow>(
+        `SELECT * FROM event_outbox
+         WHERE status IN (${placeholders})
+         ORDER BY created_at ASC, rowid ASC
+         LIMIT ?`,
+      )
+      .all(...statuses, limit)
+      .map(toEvent);
+  }
+
   stats(): OutboxStats {
     const rows = this.db
       .prepare<[], { status: EventStatus; count: number }>(
@@ -205,11 +356,65 @@ export class OutboxRepository {
       )
       .all();
 
-    const stats = { pending: 0, processing: 0, completed: 0, failed: 0 };
-    for (const row of rows) {
-      stats[row.status] = row.count;
+    const counts: Record<EventStatus, number> = {
+      pending: 0,
+      processing: 0,
+      completed: 0,
+      failed: 0,
+      dead_letter: 0,
+    };
+    for (const row of rows) counts[row.status] = row.count;
+
+    return {
+      pending: counts.pending,
+      processing: counts.processing,
+      completed: counts.completed,
+      failed: counts.failed,
+      deadLetter: counts.dead_letter,
+    };
+  }
+
+  /** Idade, em segundos, do evento pendente mais antigo (desde a criação). */
+  oldestPendingAgeSeconds(now: string): number {
+    const row = this.db
+      .prepare<[], { oldest: string | null }>(
+        "SELECT MIN(created_at) AS oldest FROM event_outbox WHERE status = 'pending'",
+      )
+      .get();
+
+    if (row?.oldest === null || row?.oldest === undefined) return 0;
+    const ageMs = new Date(now).getTime() - new Date(row.oldest).getTime();
+    return Math.max(0, Math.floor(ageMs / 1_000));
+  }
+
+  /**
+   * Recoloca um evento terminal na fila para replay manual.
+   *
+   * `attempts` é zerado e `replay_count`/`replayed_at` registram a intervenção.
+   * Um evento `processing` só é reenfileirado com `force`, e mesmo assim
+   * recebe um lease novo quando outro worker o adquirir.
+   */
+  replay(eventId: string, now: string, force = false): ReplayOutcome {
+    const existing = this.findById(eventId);
+    if (existing === null) return "not_found";
+
+    if (existing.status === "processing" && !force) return "processing";
+    if (!REPLAYABLE_STATUSES.includes(existing.status) && !force) {
+      return "not_replayable";
     }
-    return stats;
+
+    this.db
+      .prepare<[string, string, string]>(
+        `UPDATE event_outbox
+         SET status = 'pending', attempts = 0, available_at = ?,
+             processed_at = NULL, locked_at = NULL, worker_id = NULL,
+             lease_token = NULL, lease_expires_at = NULL,
+             replay_count = replay_count + 1, replayed_at = ?
+         WHERE id = ?`,
+      )
+      .run(now, now, eventId);
+
+    return "replayed";
   }
 
   hasActiveOfType(userId: string, type: EventType): boolean {
