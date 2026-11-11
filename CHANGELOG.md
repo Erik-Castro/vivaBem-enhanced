@@ -7,6 +7,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-11
+
+Décima segunda release: worker independente do Event Intelligence Engine
+(Fase 11).
+
 ### Added
 
 - Worker do Event Intelligence Engine extraído para processo independente:

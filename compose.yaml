@@ -3,8 +3,8 @@ services:
     build:
       context: .
       args:
-        VERSION: ${VERSION:-0.11.0}
-    image: vivabem:${VERSION:-0.11.0}
+        VERSION: ${VERSION:-0.12.0}
+    image: vivabem:${VERSION:-0.12.0}
     restart: unless-stopped
     stop_grace_period: 30s
     ports:
@@ -40,8 +40,8 @@ services:
     build:
       context: .
       args:
-        VERSION: ${VERSION:-0.11.0}
-    image: vivabem:${VERSION:-0.11.0}
+        VERSION: ${VERSION:-0.12.0}
+    image: vivabem:${VERSION:-0.12.0}
     # Mesma imagem, entry point diferente: o worker só consome a outbox.
     command: ["deno", "task", "worker"]
     restart: unless-stopped
@@ -87,7 +87,7 @@ services:
   web:
     build:
       context: ./web
-    image: vivabem-web:${VERSION:-0.11.0}
+    image: vivabem-web:${VERSION:-0.12.0}
     restart: unless-stopped
     depends_on:
       vivabem:
