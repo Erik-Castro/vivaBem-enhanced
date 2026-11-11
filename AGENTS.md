@@ -196,8 +196,9 @@ web/
     lib/                # api, auth, router, theme, toast, format, types
     components/         # AppShell, modais, linha de transação
     pages/              # login, register, dashboard, accounts, transactions,
-                        # categories, budgets, goals, habits, settings,
-                        # coming-soon, not-found
+                        # recurring, categories, budgets, goals, habits,
+                        # investments, achievements, notifications, insights,
+                        # data, family, settings, coming-soon, not-found
 docs/
   PLAN.md API.md ARCHITECTURE.md DECISIONS.md DEPLOY.md FRONTEND.md
 ```
@@ -390,6 +391,18 @@ src/modules/<dominio>/
 - Navegação: sidebar no desktop; no mobile (≤ 900px), cinco atalhos fixos
   (Painel, Transações, Contas, Orçamentos e Metas) e menu "Mais" em bottom
   sheet com as demais rotas.
+- Telas entregues: login/registro, painel, contas, transações, recorrências,
+  categorias, orçamentos, metas, hábitos, investimentos, conquistas,
+  notificações, insights, dados (import/export), família e configurações.
+- `notifications.svelte.ts` mantém o sino (badge, polling de 60s pausado com a
+  aba oculta) e traduz links da API para rotas do SPA; o painel é renderizado
+  fora do topbar porque o `backdrop-filter` cria containing block para
+  `position: fixed` no mobile.
+- `Data.svelte` envia `multipart/form-data` por `api()` (campo `form`) e baixa
+  exportações por `Blob`/`download()`; `Family.svelte` só busca o resumo quando
+  existe vínculo ativo; `Insights.svelte` usa a mesma busca com fallback
+  textual e não esconde os insights existentes quando a IA está desativada
+  (apenas avisa).
 - O container é Nginx não-root na porta 8080, com fallback do SPA, proxy de
   `/api`, `/health` e `/ready`, CSP e cache de assets; `sw.js` não é cacheado.
 - `vite` está fixado em 7.x de propósito: o Vite 8/Rolldown usa instruções
@@ -709,6 +722,16 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `web/src/components/InvestmentFormModal.svelte` | Criação/edição de ativos (moeda travada) |
 | `web/src/components/InvestmentDetailModal.svelte` | Performance, operações e cotações |
 | `web/src/pages/Achievements.svelte` | Catálogo, progresso, abas por status e busca |
+| `web/src/pages/Recurring.svelte` | Recorrências ativas/pausadas, projeção e run-now |
+| `web/src/components/RecurringFormModal.svelte` | Criação/edição de recorrências |
+| `web/src/pages/Notifications.svelte` | Central de notificações com abas e paginação |
+| `web/src/components/NotificationBell.svelte` | Botão do sino com badge de não lidas |
+| `web/src/components/NotificationPanel.svelte` | Painel/bottom sheet das notificações recentes |
+| `web/src/lib/notifications.svelte.ts` | Store do sino, polling e tradução de links |
+| `web/src/pages/Insights.svelte` | Insights, filtros, busca, leitura e feedback |
+| `web/src/pages/Data.svelte` | Importação CSV/OFX (prévia/commit) e exportação |
+| `web/src/pages/Family.svelte` | Convites, vínculo ativo e resumo do parceiro |
+| `web/src/components/FamilyInviteModal.svelte` | Convite familiar por e-mail |
 | `web/src/components/BudgetFormModal.svelte` | Criação/edição de orçamentos |
 | `web/src/components/TransactionFormModal.svelte` | Criação/edição de transações e transferências |
 | `web/src/app.css` | Design system, tema e responsividade |
