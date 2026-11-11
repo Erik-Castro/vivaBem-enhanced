@@ -1,5 +1,12 @@
 # Viva Bem
 
+[![CI](https://github.com/Erik-Castro/vivaBem-enhanced/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Erik-Castro/vivaBem-enhanced/actions/workflows/ci.yml)
+[![Versão](https://img.shields.io/github/v/tag/Erik-Castro/vivaBem-enhanced?label=version&sort=semver)](https://github.com/Erik-Castro/vivaBem-enhanced/tags)
+[![Deno](https://img.shields.io/badge/Deno-2.9-000000?logo=deno&logoColor=white)](https://deno.com/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)
+[![Licença: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 App de finanças pessoais + construção de hábitos, com análise assíncrona por IA. Este repositório é
 uma reescrita greenfield, **API-first**, a partir do projeto legado em `reference_only/` (somente
 leitura).
@@ -145,9 +152,10 @@ make web-build        # build de produção em web/dist
 cd web && npm run preview   # build em http://localhost:4173 (APP_ORIGIN igual)
 ```
 
-Telas entregues: login/cadastro, painel, contas, transações (com transferência), categorias,
-orçamentos, metas, hábitos, investimentos, conquistas e configurações (perfil, preferências, sessões
-e tema). Detalhes: [`docs/FRONTEND.md`](docs/FRONTEND.md).
+Telas entregues: login/cadastro, painel, contas, transações (com transferência), recorrências,
+categorias, orçamentos, metas, hábitos, investimentos, conquistas, notificações, insights, dados
+(import/export), família e configurações (perfil, preferências, sessões e tema). Detalhes:
+[`docs/FRONTEND.md`](docs/FRONTEND.md).
 
 ## Autenticação
 
@@ -168,6 +176,8 @@ Em produção os cookies usam `Secure`. Em desenvolvimento (`ENV=development`) r
 ```bash
 deno task dev            # servidor com watch
 deno task start          # servidor
+deno task dev:worker     # worker do EIE com watch (outbox → IA)
+deno task worker         # worker do EIE (processo separado da API)
 deno task test           # testes
 deno task test:coverage  # testes com cobertura
 deno task check          # typecheck
@@ -176,6 +186,8 @@ deno task fmt            # formatação
 deno task db:migrate     # migrações
 deno task db:reset       # apaga e recria o banco
 deno task db:backup      # backup em backups/
+deno task outbox:replay --list  # eventos em dead letter
+deno task outbox:replay --id=<uuid> --force  # recoloca na fila
 deno task check:release  # valida versão x changelog
 
 make web-install         # npm ci no frontend
@@ -190,21 +202,25 @@ Ou use o `Makefile`: `make help`.
 
 Todas as variáveis estão em [`.env.example`](.env.example). Destaques:
 
-| Variável                | Padrão                   | Observação                                                 |
-| ----------------------- | ------------------------ | ---------------------------------------------------------- |
-| `PORT`                  | `3000`                   |                                                            |
-| `ENV`                   | `development`            | `development`, `test`, `production`                        |
-| `DATABASE_PATH`         | `./data/app.db`          | Use `/app/data/app.db` no Docker                           |
-| `APP_ORIGIN`            | `http://localhost:3000`  | Origem exata do frontend (CORS/CSRF)                       |
-| `WEB_PORT`              | `8080`                   | Porta publicada do container web no Compose                |
-| `JWT_SECRET`            | —                        | **Obrigatório em produção** (32+ caracteres)               |
-| `RATE_LIMIT_AUTH_MAX`   | `5`                      | Tentativas por minuto em autenticação                      |
-| `RATE_LIMIT_DATA_MAX`   | `30`                     | Chamadas por minuto em import/export                       |
-| `AI_ENABLED`            | `false`                  | O `.env.example` liga com Ollama local; opt-in por usuário |
-| `AI_PROVIDER`           | `openai`                 | `openai` (compatível) ou `ollama`                          |
-| `AI_MODEL`              | —                        | Modelo de chat do Ollama (ex.: `qwen3.5:2b`)               |
-| `AI_OLLAMA_URL`         | `http://localhost:11434` | Endpoint do Ollama                                         |
-| `VECTOR_EXTENSION_PATH` | —                        | Sobrescreve o binário do `sqlite-vector`                   |
+| Variável                  | Padrão                   | Observação                                                 |
+| ------------------------- | ------------------------ | ---------------------------------------------------------- |
+| `PORT`                    | `3000`                   |                                                            |
+| `ENV`                     | `development`            | `development`, `test`, `production`                        |
+| `DATABASE_PATH`           | `./data/app.db`          | Use `/app/data/app.db` no Docker                           |
+| `APP_ORIGIN`              | `http://localhost:3000`  | Origem exata do frontend (CORS/CSRF)                       |
+| `WEB_PORT`                | `8080`                   | Porta publicada do container web no Compose                |
+| `JWT_SECRET`              | —                        | **Obrigatório em produção** (32+ caracteres)               |
+| `RATE_LIMIT_AUTH_MAX`     | `5`                      | Tentativas por minuto em autenticação                      |
+| `RATE_LIMIT_DATA_MAX`     | `30`                     | Chamadas por minuto em import/export                       |
+| `AI_ENABLED`              | `false`                  | O `.env.example` liga com Ollama local; opt-in por usuário |
+| `AI_PROVIDER`             | `openai`                 | `openai` (compatível) ou `ollama`                          |
+| `AI_MODEL`                | —                        | Modelo de chat do Ollama (ex.: `qwen3.5:2b`)               |
+| `AI_OLLAMA_URL`           | `http://localhost:11434` | Endpoint do Ollama                                         |
+| `WORKER_CONCURRENCY`      | `1`                      | Eventos processados em paralelo (1 a 8)                    |
+| `WORKER_LEASE_MS`         | `60000`                  | Validade do lease do evento                                |
+| `WORKER_MAX_ATTEMPTS`     | `5`                      | Tentativas antes do dead letter                            |
+| `WORKER_POLL_INTERVAL_MS` | `1000`                   | Intervalo de polling da outbox                             |
+| `VECTOR_EXTENSION_PATH`   | —                        | Sobrescreve o binário do `sqlite-vector`                   |
 
 Nenhum segredo tem valor padrão em produção. Em dev, um segredo efêmero é gerado no boot (com aviso
 no log).
@@ -220,6 +236,12 @@ A IA continua opt-in por usuário: depois do login, ative "Inteligência artific
 Sem isso nenhum evento entra no outbox. Em produção, defina `AI_ENABLED=false` (ou configure um
 provider com chave).
 
+O consumidor do outbox é um processo independente: `deno task worker` (ou `deno task dev:worker` com
+watch). A API responde normalmente mesmo com o provider lento; os dois processos compartilham apenas
+o arquivo SQLite. Sem `AI_ENABLED=true` o worker registra `worker_disabled` e encerra. Eventos que
+esgotam as tentativas ficam em dead letter e podem ser inspecionados com
+`deno task outbox:replay --list`.
+
 ## Docker
 
 Deploy em um comando com Compose (build da API + frontend, volumes e healthcheck):
@@ -233,6 +255,15 @@ curl -fsS http://127.0.0.1:3000/ready
 
 - API: `http://localhost:3000` (health em `/health`)
 - Frontend: `http://localhost:8080` (Nginx não-root, proxy para a API)
+
+O worker de IA é um serviço separado, no profile `ai` do Compose:
+
+```bash
+docker compose --profile ai up -d --build   # API + frontend + worker
+docker compose --profile ai up -d worker    # apenas o worker
+```
+
+Sem IA habilitada ele encerra com `worker_disabled`; a stack continua funcionando sem o worker.
 
 Em produção troque `APP_ORIGIN` pela URL HTTPS pública do frontend e mantenha `COOKIE_SECURE=true`.
 
@@ -273,14 +304,15 @@ Backup, restore, Portainer e checklist de produção: [`docs/DEPLOY.md`](docs/DE
 
 ```text
 src/
-  main.ts          # bootstrap: config → migrações → seed → servidor
+  main.ts          # bootstrap da API: config → migrações → seed → servidor
+  worker/          # entry point e runtime do consumidor da outbox (IA)
   app.ts           # factory do Hono (sem efeitos colaterais)
   config.ts        # env validado com Zod
   version.ts       # versão lida do deno.json
   http/            # erros, OpenAPI, middlewares
   db/              # conexão, migrações, repositórios
   modules/         # domínios (auth, transactions, habits, ...)
-  events/          # outbox + worker
+  events/          # outbox + registry + replay CLI
   ai/              # providers, prompts, tools, executor, embeddings
   shared/          # logger, crypto, utils
 tests/             # unit, integration, e2e
@@ -298,7 +330,7 @@ web/               # SPA Svelte 5 + Vite + PWA (Nginx no Compose)
 ## Status
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
-6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação) e 10 (frontend
-Svelte 5 + Vite/PWA) concluídas — versão atual `0.11.0`. Todas as telas do frontend foram entregues:
-autenticação, painel, contas, transações, categorias, orçamentos, metas, hábitos, investimentos e
-conquistas. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
+6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend
+Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão atual `0.12.0`. Todas as telas
+do frontend foram entregues: autenticação, painel, contas, transações, categorias, orçamentos,
+metas, hábitos, investimentos e conquistas. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).

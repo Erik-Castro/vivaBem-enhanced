@@ -617,14 +617,16 @@ Worker (claim/lease)
 | 8 | Dados e colaboração: import CSV/OFX com dedupe, export, family links | 3–4 dias | import com preview/erros; export completo; acesso familiar escopado |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | 3–4 dias | CI verde; E2E; deploy one-command |
 | 10 | Frontend Svelte 5 + Vite/PWA: fundação, auth, painel, contas, transações/categorias, PWA e deploy | 5–7 dias (MVP) | `svelte-check` e build verdes; fluxo completo no navegador; um comando de deploy |
+| 11 | Worker independente: entry point próprio, lease com token, dead letter, replay e dedupe | 2–3 dias | API não consome outbox; entrega pelo menos uma vez com efeitos idempotentes; replay auditado |
 
 **Total da API: ~31–43 dias.** Frontend completo: ~15–20 dias; o MVP da Fase 10
 cobre fundação, autenticação, painel e finanças.
 
-Fases 0 a 10 concluídas e publicadas de `0.1.0` a `0.11.0`. Todas as telas do
+Fases 0 a 11 concluídas e publicadas de `0.1.0` a `0.12.0`. Todas as telas do
 frontend estão entregues: fundação, autenticação, painel, contas, transações,
-categorias, orçamentos, metas, hábitos, investimentos, conquistas, PWA e
-deploy.
+categorias, orçamentos, metas, hábitos, investimentos, conquistas, notificações,
+insights, importação/exportação, família, PWA e deploy. A IA roda em processo
+separado, com lease, dead letter e replay auditado.
 
 ---
 
@@ -812,10 +814,11 @@ make web-build           # build de produção em web/dist
 
 ## 16. Próximo passo
 
-Concluir a **Fase 10** (frontend Svelte 5 + Vite/PWA): implementar as telas de
-orçamentos, metas, hábitos, investimentos e conquistas sobre o MVP já entregue.
-A API está congelada em `/api/v1`; mudanças de contrato exigem `/api/v2` +
-release MAJOR.
+A **Fase 11** (worker independente) está concluída em `0.12.0`: a API não
+consome mais o outbox, o worker tem lease com token, dead letter e replay
+auditado. O próximo ciclo é operacional — monitorar dead letter, backups e
+prontidão — e qualquer nova funcionalidade exige escopo aprovado. A API está
+congelada em `/api/v1`; mudanças de contrato exigem `/api/v2` + release MAJOR.
 
 ---
 
@@ -848,9 +851,34 @@ Detalhes de arquitetura, rotas e operação: [`FRONTEND.md`](FRONTEND.md).
 
 ### 17.2 Pendente
 
-- Notificações e insights da IA na interface.
-- Importação/exportação e vínculo familiar na interface.
 - Testes de componentes e E2E de UI no CI.
 - Fila offline/sincronização em segundo plano (hoje o app abre offline, mas
   mutações falham com mensagem).
+
+---
+
+## 18. Fase 11 — detalhamento
+
+Especificação: [`Worker_Migrations_Spec.md`](Worker_Migrations_Spec.md).
+
+### 18.1 Entregue
+
+- Entry points separados: `src/main.ts` (API) e `src/worker/main.ts` (worker),
+  compartilhando apenas o arquivo SQLite.
+- `event_outbox` com `lease_token`/`lease_expires_at`, estado terminal
+  `dead_letter`, `replay_count`/`replayed_at` e `dedupe_key` em insights e
+  notificações (migração `010_worker.sql`).
+- Claim atômico, renovação de lease por heartbeat, recuperação de leases
+  vencidos, backoff com jitter, concorrência configurável e shutdown gracioso.
+- `assertSchemaCurrent`: o worker falha no boot se o schema estiver atrasado.
+- `deno task worker`/`dev:worker`, `deno task outbox:replay` e serviço `worker`
+  no Compose (profile `ai`).
+- Testes de lease, dead letter, replay, runtime, concorrência e dedupe.
+
+### 18.2 Pendente
+
+- Build/validação das imagens no CI (Docker não disponível em todo ambiente
+  local).
+- Painel operacional de outbox (hoje a inspeção é pela CLI e pelos logs
+  `worker_stats`).
 

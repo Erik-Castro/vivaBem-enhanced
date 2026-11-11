@@ -52,6 +52,11 @@ limitadas trazem `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `Retry-After`.
 | Dados | `/import`, `/export` | CSV/OFX e bundle JSON/CSV |
 | Colaboração | `/family` | convites e resumo agregado |
 
+A análise de IA é assíncrona: a escrita responde sem esperar o provider e o
+evento é consumido pelo worker independente (`src/worker/`). Por isso um insight
+pode aparecer alguns segundos depois da transação; `AI_ENABLED=false` ou o
+opt-out do usuário simplesmente não gera evento.
+
 A lista completa de endpoints e schemas está em `/api/v1/openapi.json` e no
 [`README`](../README.md).
 
