@@ -374,6 +374,29 @@ export class OutboxRepository {
     };
   }
 
+  /** Distribuição por tipo de evento dentro de um status. */
+  statsByType(status: EventStatus): Array<{ type: EventType; count: number }> {
+    return this.db
+      .prepare<[EventStatus], { type: EventType; count: number }>(
+        `SELECT type, COUNT(*) AS count FROM event_outbox
+         WHERE status = ?
+         GROUP BY type
+         ORDER BY count DESC, type ASC`,
+      )
+      .all(status);
+  }
+
+  /** Eventos pendentes que já falharam pelo menos uma vez. */
+  retryingCount(): number {
+    const row = this.db
+      .prepare<[], { count: number }>(
+        "SELECT COUNT(*) AS count FROM event_outbox WHERE status = 'pending' AND attempts > 0",
+      )
+      .get();
+
+    return row?.count ?? 0;
+  }
+
   /** Idade, em segundos, do evento pendente mais antigo (desde a criação). */
   oldestPendingAgeSeconds(now: string): number {
     const row = this.db

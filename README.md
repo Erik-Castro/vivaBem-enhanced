@@ -186,6 +186,7 @@ deno task fmt            # formatação
 deno task db:migrate     # migrações
 deno task db:reset       # apaga e recria o banco
 deno task db:backup      # backup em backups/
+deno task outbox:replay --stats             # resumo da fila (totais, retries, dead letter)
 deno task outbox:replay --list  # eventos em dead letter
 deno task outbox:replay --id=<uuid> --force  # recoloca na fila
 deno task check:release  # valida versão x changelog
@@ -239,8 +240,8 @@ provider com chave).
 O consumidor do outbox é um processo independente: `deno task worker` (ou `deno task dev:worker` com
 watch). A API responde normalmente mesmo com o provider lento; os dois processos compartilham apenas
 o arquivo SQLite. Sem `AI_ENABLED=true` o worker registra `worker_disabled` e encerra. Eventos que
-esgotam as tentativas ficam em dead letter e podem ser inspecionados com
-`deno task outbox:replay --list`.
+esgotam as tentativas ficam em dead letter; `deno task outbox:replay --stats` dá o panorama da fila
+(totais, retries e dead letter por tipo) e `--list` mostra os eventos um a um.
 
 ## Docker
 

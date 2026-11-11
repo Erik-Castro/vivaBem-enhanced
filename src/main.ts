@@ -1,7 +1,7 @@
 import { type AppConfig, ConfigError, loadConfig } from "./config.ts";
 import { createLogger } from "./shared/logger/index.ts";
 import { createDatabase } from "./db/client.ts";
-import { loadMigrations, migrate, MigrationError } from "./db/migrate.ts";
+import { loadMigrations, migrate, MigrationError, type MigrationFile } from "./db/migrate.ts";
 import { runMaintenance } from "./db/maintenance.ts";
 import { createApp } from "./app.ts";
 import { APP_VERSION } from "./version.ts";
@@ -48,8 +48,9 @@ const db = createDatabase({
 
 // A API é dona do schema: o worker independente apenas verifica se ele está em
 // dia (`assertSchemaCurrent`). Migração nunca roda em dois processos.
+let migrations: readonly MigrationFile[] = [];
 try {
-  const migrations = await loadMigrations();
+  migrations = await loadMigrations();
   const result = migrate(db, migrations, logger);
   logger.info("migrations_complete", {
     applied: result.applied.length,
@@ -80,7 +81,7 @@ const maintenanceTimer = setInterval(applyMaintenance, 24 * 60 * 60 * 1_000);
 // executor e correlações vivem no processo `src/worker/main.ts`.
 const embeddings = createEmbeddingsService({ db, config, logger });
 
-const app = createApp({ db, config, logger, embeddings });
+const app = createApp({ db, config, logger, embeddings, migrations });
 
 // Catálogo de conquistas é idempotente por título: reiniciar não duplica.
 try {

@@ -47,7 +47,31 @@ Deno.test("GET /ready responde 200 quando o banco está migrado", async () => {
     assertEquals(response.status, 200);
     assertEquals(body.data.status, "ready");
     assertEquals(body.data.checks.database, "ok");
+    assertEquals(body.data.checks.schema, "ok");
     assertEquals(body.data.checks.migrations >= 1, true);
+  } finally {
+    testApp.cleanup();
+  }
+});
+
+Deno.test("GET /ready responde 503 quando o schema está defasado", async () => {
+  const testApp = await createTestApp();
+
+  try {
+    // Simula API antiga servindo tráfego com schema atrás do código.
+    testApp.database.db
+      .prepare(
+        "DELETE FROM schema_migrations WHERE version = (SELECT MAX(version) FROM schema_migrations)",
+      )
+      .run();
+
+    const response = await testApp.app.request("/ready");
+    const body = await response.json();
+
+    assertEquals(response.status, 503);
+    assertEquals(body.data.status, "not_ready");
+    assertEquals(body.data.checks.database, "ok");
+    assertEquals(body.data.checks.schema, "outdated");
   } finally {
     testApp.cleanup();
   }

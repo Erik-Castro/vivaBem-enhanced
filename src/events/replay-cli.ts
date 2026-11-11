@@ -13,6 +13,7 @@ import { OutboxRepository } from "./outbox.repository.ts";
  * menos uma vez".
  */
 interface CliOptions {
+  readonly stats: boolean;
   readonly list: boolean;
   readonly id?: string;
   readonly force: boolean;
@@ -28,25 +29,30 @@ function usage(): string {
   return [
     "Uso: deno task outbox:replay <comando>",
     "",
+    "  --stats                resumo da fila (totais, retries e dead letter por tipo)",
     "  --list                 lista eventos em dead letter",
     "  --id=<uuid>            recoloca um evento terminal na fila",
     "  --force                permite replay de evento pendente/em processamento",
     `  --limit=<n>            limite da listagem (padrão ${DEFAULT_LIMIT}, máx ${MAX_LIMIT})`,
     "",
     "Exemplos:",
+    "  deno task outbox:replay --stats",
     "  deno task outbox:replay --list",
     "  deno task outbox:replay --id=0192f0c4-... --force",
   ].join("\n");
 }
 
 function parseArgs(args: readonly string[]): CliOptions {
+  let stats = false;
   let list = false;
   let force = false;
   let id: string | undefined;
   let limit = DEFAULT_LIMIT;
 
   for (const arg of args) {
-    if (arg === "--list") {
+    if (arg === "--stats") {
+      stats = true;
+    } else if (arg === "--list") {
       list = true;
     } else if (arg === "--force") {
       force = true;
@@ -66,7 +72,7 @@ function parseArgs(args: readonly string[]): CliOptions {
     }
   }
 
-  return { list, id, force, limit };
+  return { stats, list, id, force, limit };
 }
 
 const encoder = new TextEncoder();
@@ -94,13 +100,15 @@ function summary(event: OutboxEvent): Record<string, unknown> {
 
 try {
   const options = parseArgs(Deno.args);
+  const commands = [options.stats, options.list, options.id !== undefined]
+    .filter(Boolean).length;
 
-  if (!options.list && options.id === undefined) {
+  if (commands === 0) {
     write(usage());
     Deno.exit(1);
   }
-  if (options.list && options.id !== undefined) {
-    throw new Error("use --list ou --id, não ambos");
+  if (commands > 1) {
+    throw new Error("use apenas um comando: --stats, --list ou --id");
   }
 
   const config = loadWorkerConfig();
@@ -113,6 +121,20 @@ try {
   try {
     assertSchemaCurrent(db, await loadMigrations());
     const repository = new OutboxRepository(db);
+
+    if (options.stats) {
+      const now = new Date().toISOString();
+      const payload = {
+        generatedAt: now,
+        totals: repository.stats(),
+        oldestPendingAgeSeconds: repository.oldestPendingAgeSeconds(now),
+        retrying: repository.retryingCount(),
+        pendingByType: repository.statsByType("pending"),
+        deadLetterByType: repository.statsByType("dead_letter"),
+      };
+      write(JSON.stringify(payload, null, 2));
+      Deno.exit(0);
+    }
 
     if (options.list) {
       const events = repository.listByStatus([...LISTABLE_STATUSES], options.limit);

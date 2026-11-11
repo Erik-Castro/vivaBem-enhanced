@@ -198,6 +198,9 @@ Eventos que esgotaram as tentativas ou falharam de forma permanente ficam em
 `UPDATE` manual:
 
 ```bash
+# Panorama da fila (totais, idade do pendente mais antigo, retries e dead letter por tipo)
+docker compose exec vivabem deno task outbox:replay --stats
+
 # Lista os eventos terminais (JSON no stdout)
 docker compose exec vivabem deno task outbox:replay --list
 

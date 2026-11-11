@@ -195,6 +195,66 @@ Deno.test("claim é atômico, prioriza e cria lease", async () => {
   });
 });
 
+Deno.test("statsByType e retryingCount resumem a fila para operação", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const now = new Date().toISOString();
+    const next = new Date(Date.now() + 5_000).toISOString();
+
+    // Dois eventos do mesmo tipo e um de outro, todos pendentes.
+    const first = insertEvent(repository, userId, {
+      type: "finance.transaction.created",
+      availableAt: now,
+      now,
+    });
+    insertEvent(repository, userId, {
+      type: "finance.transaction.created",
+      availableAt: now,
+      now,
+    });
+    insertEvent(repository, userId, { type: "habit.log.created", availableAt: now, now });
+
+    assertEquals(repository.retryingCount(), 0);
+
+    // O primeiro falha uma vez: volta para pending com attempts = 1.
+    const claimed = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    assertExists(claimed);
+    assertEquals(
+      repository.fail(claimed, {
+        error: "timeout",
+        now,
+        nextAvailableAt: next,
+        maxAttempts: 5,
+      }),
+      "retry",
+    );
+
+    assertEquals(repository.retryingCount(), 1);
+    assertEquals(repository.statsByType("pending"), [
+      { type: "finance.transaction.created", count: 2 },
+      { type: "habit.log.created", count: 1 },
+    ]);
+
+    // Falha permanente vai para dead letter e aparece no recorte por tipo.
+    const second = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    assertExists(second);
+    assertEquals(
+      repository.fail(second, {
+        error: "payload inválido",
+        now,
+        nextAvailableAt: next,
+        maxAttempts: 5,
+        permanent: true,
+      }),
+      "dead_letter",
+    );
+
+    assertEquals(repository.statsByType("dead_letter").length, 1);
+    assertEquals(repository.statsByType("dead_letter")[0]?.count, 1);
+    assertEquals(repository.findById(first)?.replayCount, 0);
+  });
+});
+
 Deno.test("claim ignora eventos ainda não disponíveis", async () => {
   await withDatabase((database, userId) => {
     const repository = new OutboxRepository(database.db);

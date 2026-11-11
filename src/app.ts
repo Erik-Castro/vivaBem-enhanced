@@ -3,6 +3,7 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { cors } from "@hono/hono/cors";
 import type { AppConfig } from "./config.ts";
 import type { AppDatabase } from "./db/client.ts";
+import { inspectSchema, type MigrationFile, type SchemaStatus } from "./db/migrate.ts";
 import type { Logger } from "./shared/logger/index.ts";
 import { AppError } from "./http/errors.ts";
 import { toErrorResponse } from "./http/error-handler.ts";
@@ -72,6 +73,11 @@ export interface AppDependencies {
   readonly db: AppDatabase;
   readonly config: AppConfig;
   readonly logger: Logger;
+  /**
+   * Migrações carregadas do disco. O `/ready` compara com o banco para não
+   * declarar pronta uma instância rodando com schema defasado.
+   */
+  readonly migrations: readonly MigrationFile[];
   /** Opcional: sem provider, a busca de insights cai para texto. */
   readonly embeddings?: EmbeddingsService | null;
 }
@@ -79,10 +85,16 @@ export interface AppDependencies {
 /**
  * Cria a aplicação Hono sem efeitos colaterais de I/O.
  *
- * O banco, a configuração e o logger são injetados — os testes montam a app
- * com um banco temporário em vez de usar um singleton global.
+ * O banco, a configuração, o logger e as migrações são injetados — os testes
+ * montam a app com um banco temporário em vez de usar um singleton global.
  */
-export function createApp({ db, config, logger, embeddings = null }: AppDependencies) {
+export function createApp({
+  db,
+  config,
+  logger,
+  migrations,
+  embeddings = null,
+}: AppDependencies) {
   const app = new OpenAPIHono<AppEnv>({
     defaultHook: (result) => {
       if (!result.success) {
@@ -282,25 +294,29 @@ export function createApp({ db, config, logger, embeddings = null }: AppDependen
     ));
 
   app.openapi(readyRoute, (c) => {
-    let migrations = 0;
     let databaseOk = true;
+    let status: SchemaStatus | null = null;
 
     try {
       db.prepare("SELECT 1 AS ok").get();
-      migrations = db
-        .prepare<[], { count: number }>("SELECT COUNT(*) AS count FROM schema_migrations")
-        .get()?.count ?? 0;
+      status = inspectSchema(db, migrations);
     } catch {
       databaseOk = false;
     }
 
-    const ready = databaseOk;
+    const schema = status === null
+      ? ("unknown" as const)
+      : status.current
+      ? ("ok" as const)
+      : ("outdated" as const);
+    const ready = databaseOk && schema === "ok";
     const body = {
       data: {
         status: ready ? ("ready" as const) : ("not_ready" as const),
         checks: {
           database: databaseOk ? ("ok" as const) : ("error" as const),
-          migrations,
+          migrations: status?.applied ?? 0,
+          schema,
         },
       },
       meta: { requestId: c.get("requestId") },

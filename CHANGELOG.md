@@ -7,6 +7,21 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added
+
+- `deno task outbox:replay --stats`: panorama da fila com totais por status,
+  idade do evento pendente mais antigo, pendentes em retry (`attempts > 0`) e
+  dead letter agrupado por tipo de evento.
+- `worker_stats` agora inclui `retrying` e `deadLetterByType`, para diferenciar
+  falha de provider de payload inválido sem abrir o banco.
+
+### Changed
+
+- `GET /ready` valida se o schema aplicado corresponde às migrações do código e
+  responde 503 (`status: not_ready`, `checks.schema: outdated`) quando o banco
+  está atrás — antes só checava se a conexão respondia. A resposta ganhou
+  `checks.schema` (`ok`, `outdated` ou `unknown`).
+
 ## [0.12.0] - 2026-11-11
 
 Décima segunda release: worker independente do Event Intelligence Engine

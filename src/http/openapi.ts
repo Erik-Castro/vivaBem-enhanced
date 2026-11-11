@@ -39,6 +39,8 @@ export const ReadyResponseSchema = z
       checks: z.object({
         database: z.enum(["ok", "error"]),
         migrations: z.number().int().nonnegative(),
+        /** Só fica `ok` quando o banco tem exatamente as migrações do código. */
+        schema: z.enum(["ok", "outdated", "unknown"]),
       }),
     }),
     meta: MetaSchema,
@@ -64,14 +66,15 @@ export const readyRoute = createRoute({
   path: "/ready",
   tags: ["System"],
   summary: "Readiness probe",
-  description: "Verifica a conexão com o banco e as migrações aplicadas.",
+  description: "Verifica a conexão com o banco e se o schema aplicado corresponde ao das " +
+    "migrações do código.",
   responses: {
     200: {
       description: "Pronto para receber tráfego",
       content: { "application/json": { schema: ReadyResponseSchema } },
     },
     503: {
-      description: "Ainda não está pronto",
+      description: "Ainda não está pronto (banco inacessível ou schema defasado)",
       content: { "application/json": { schema: ReadyResponseSchema } },
     },
   },

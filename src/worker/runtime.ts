@@ -481,6 +481,10 @@ export class WorkerRuntime {
         workerId: this.#workerId,
         ...stats,
         oldestPendingAgeSeconds: this.#repository.oldestPendingAgeSeconds(now),
+        // Pendentes que já falharam e a distribuição do dead letter: é o que o
+        // operador precisa para decidir se o problema é de provider ou de payload.
+        retrying: this.#repository.retryingCount(),
+        deadLetterByType: this.#repository.statsByType("dead_letter"),
         processingInThisWorker: this.#inFlight.size,
         leaseRecoveries: this.#leaseRecoveries,
       });

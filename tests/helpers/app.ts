@@ -1,5 +1,6 @@
 import { createApp } from "../../src/app.ts";
 import { type AppConfig, loadConfig } from "../../src/config.ts";
+import { loadMigrations } from "../../src/db/migrate.ts";
 import { createLogger, type Logger } from "../../src/shared/logger/index.ts";
 import { seedAchievements } from "../../src/modules/achievements/achievements.seed.ts";
 import { createTestDatabase, type TestDatabase } from "./db.ts";
@@ -28,7 +29,12 @@ export async function createTestApp(options: TestAppOptions = {}): Promise<TestA
   const logger = createLogger({ level: "error", silent: true });
   const database = await createTestDatabase({ migrate: options.migrate ?? true });
   if (options.migrate ?? true) seedAchievements(database.db);
-  const app = createApp({ db: database.db, config, logger });
+  const app = createApp({
+    db: database.db,
+    config,
+    logger,
+    migrations: await loadMigrations(),
+  });
 
   return {
     app,

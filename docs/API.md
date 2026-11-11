@@ -72,7 +72,8 @@ A lista completa de endpoints e schemas está em `/api/v1/openapi.json` e no
 ## Saúde
 
 - `GET /health`: liveness com versão e uptime.
-- `GET /ready`: banco acessível e contagem de migrações aplicadas.
+- `GET /ready`: banco acessível e schema atual; responde 503 quando o banco está
+  inacessível ou atrás das migrações do código (`checks.schema`).
 
 ## Versionamento
 

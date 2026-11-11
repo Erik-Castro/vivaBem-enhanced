@@ -151,6 +151,78 @@ export function migrate(
   return { applied: executed, total: migrations.length };
 }
 
+export interface SchemaStatus {
+  /** `true` quando o banco tem exatamente as migrações fornecidas, com checksums iguais. */
+  readonly current: boolean;
+  /** Quantas migrações estão aplicadas no banco. */
+  readonly applied: number;
+  /** Migrações que existem em arquivo mas ainda não foram aplicadas. */
+  readonly pending: readonly string[];
+  /** Problemas encontrados, na ordem em que bloqueiam o worker. */
+  readonly issues: readonly string[];
+}
+
+/**
+ * Diagnostica o schema sem aplicar nada.
+ *
+ * Mesma regra de `assertSchemaCurrent`, mas devolve o resultado em vez de
+ * lançar — a API usa isso no `/ready` para responder 503 quando o banco está
+ * atrás do código em vez de se declarar pronta.
+ */
+export function inspectSchema(
+  db: AppDatabase,
+  migrations: readonly MigrationFile[],
+): SchemaStatus {
+  const schemaTable = db
+    .prepare<[], { name: string }>(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'",
+    )
+    .get();
+
+  if (schemaTable === undefined) {
+    return {
+      current: false,
+      applied: 0,
+      pending: migrations.map((migration) => migration.name),
+      issues: [
+        "Banco não migrado: inicie a API (`deno task db:migrate`) antes do worker",
+      ],
+    };
+  }
+
+  const applied = db
+    .prepare<[], AppliedMigrationRow>(
+      "SELECT version, name, checksum FROM schema_migrations ORDER BY version",
+    )
+    .all();
+  const available = new Map(migrations.map((migration) => [migration.version, migration]));
+  const appliedVersions = new Set(applied.map((row) => row.version));
+  const issues: string[] = [];
+
+  for (const row of applied) {
+    const file = available.get(row.version);
+    if (!file) {
+      issues.push(
+        `Migração ${row.version} está aplicada no banco, mas o arquivo não existe mais`,
+      );
+    } else if (file.checksum !== row.checksum) {
+      issues.push(`Checksum divergente na migração ${row.version} (${row.name})`);
+    }
+  }
+
+  const pending = migrations
+    .filter((migration) => !appliedVersions.has(migration.version))
+    .map((migration) => migration.name);
+
+  if (pending.length > 0) {
+    issues.push(
+      `Schema desatualizado: inicie a API para aplicar ${pending.join(", ")} antes do worker`,
+    );
+  }
+
+  return { current: issues.length === 0, applied: applied.length, pending, issues };
+}
+
 /**
  * Verifica se o banco está exatamente no schema esperado, sem aplicar nada.
  *
@@ -165,46 +237,10 @@ export function assertSchemaCurrent(
   db: AppDatabase,
   migrations: readonly MigrationFile[],
 ): void {
-  const schemaTable = db
-    .prepare<[], { name: string }>(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'",
-    )
-    .get();
+  const status = inspectSchema(db, migrations);
 
-  if (schemaTable === undefined) {
-    throw new MigrationError(
-      "Banco não migrado: inicie a API (`deno task db:migrate`) antes do worker",
-    );
-  }
-
-  const applied = db
-    .prepare<[], AppliedMigrationRow>(
-      "SELECT version, name, checksum FROM schema_migrations ORDER BY version",
-    )
-    .all();
-  const available = new Map(migrations.map((migration) => [migration.version, migration]));
-  const appliedVersions = new Set(applied.map((row) => row.version));
-
-  for (const row of applied) {
-    const file = available.get(row.version);
-    if (!file) {
-      throw new MigrationError(
-        `Migração ${row.version} está aplicada no banco, mas o arquivo não existe mais`,
-      );
-    }
-    if (file.checksum !== row.checksum) {
-      throw new MigrationError(
-        `Checksum divergente na migração ${row.version} (${row.name})`,
-      );
-    }
-  }
-
-  const pending = migrations.filter((migration) => !appliedVersions.has(migration.version));
-  if (pending.length > 0) {
-    const versions = pending.map((migration) => migration.name).join(", ");
-    throw new MigrationError(
-      `Schema desatualizado: inicie a API para aplicar ${versions} antes do worker`,
-    );
+  if (!status.current) {
+    throw new MigrationError(status.issues[0] ?? "Schema inválido");
   }
 }
 

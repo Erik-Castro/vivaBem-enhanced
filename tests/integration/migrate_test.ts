@@ -1,6 +1,7 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assertEquals, assertExists, assertThrows } from "@std/assert";
 import {
   assertSchemaCurrent,
+  inspectSchema,
   loadMigrations,
   migrate,
   MigrationError,
@@ -177,6 +178,86 @@ Deno.test("assertSchemaCurrent recusa schema desatualizado", async () => {
       MigrationError,
       "Schema desatualizado",
     );
+  } finally {
+    testDb.cleanup();
+  }
+});
+
+Deno.test("inspectSchema descreve banco migrado", async () => {
+  const testDb = await createTestDatabase();
+
+  try {
+    const migrations = await loadMigrations();
+    const status = inspectSchema(testDb.db, migrations);
+
+    assertEquals(status.current, true);
+    assertEquals(status.applied, migrations.length);
+    assertEquals(status.pending, []);
+    assertEquals(status.issues, []);
+  } finally {
+    testDb.cleanup();
+  }
+});
+
+Deno.test("inspectSchema aponta migração pendente", async () => {
+  const testDb = await createTestDatabase();
+
+  try {
+    const migrations = await loadMigrations();
+    const last = migrations.at(-1);
+    assertExists(last);
+
+    testDb.db
+      .prepare<[number]>("DELETE FROM schema_migrations WHERE version = ?")
+      .run(last.version);
+
+    const status = inspectSchema(testDb.db, migrations);
+
+    assertEquals(status.current, false);
+    assertEquals(status.applied, migrations.length - 1);
+    assertEquals(status.pending, [last.name]);
+    assertEquals(status.issues[0]?.includes("Schema desatualizado"), true);
+  } finally {
+    testDb.cleanup();
+  }
+});
+
+Deno.test("inspectSchema aponta migração aplicada sem arquivo", async () => {
+  const testDb = await createTestDatabase();
+
+  try {
+    const migrations = await loadMigrations();
+
+    testDb.db
+      .prepare<[number, string, string]>(
+        `INSERT INTO schema_migrations (version, name, checksum, applied_at, execution_time_ms)
+         VALUES (?, '999_futura.sql', ?, ?, 0)`,
+      )
+      .run(999, "0".repeat(64), new Date().toISOString());
+
+    const status = inspectSchema(testDb.db, migrations);
+
+    assertEquals(status.current, false);
+    assertEquals(status.issues[0]?.includes("não existe mais"), true);
+  } finally {
+    testDb.cleanup();
+  }
+});
+
+Deno.test("inspectSchema aponta checksum divergente", async () => {
+  const testDb = await createTestDatabase();
+
+  try {
+    const migrations = await loadMigrations();
+
+    testDb.db
+      .prepare<[string, number]>("UPDATE schema_migrations SET checksum = ? WHERE version = ?")
+      .run("f".repeat(64), 1);
+
+    const status = inspectSchema(testDb.db, migrations);
+
+    assertEquals(status.current, false);
+    assertEquals(status.issues[0]?.includes("Checksum divergente"), true);
   } finally {
     testDb.cleanup();
   }
