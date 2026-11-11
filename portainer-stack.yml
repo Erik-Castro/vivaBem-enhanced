@@ -4,7 +4,7 @@ version: "3.8"
 
 services:
   vivabem:
-    image: vivabem:${VERSION:-1.0.0}
+    image: erikcastro255/vivabem:${VERSION:-1.0.0}
     restart: unless-stopped
     stop_grace_period: 30s
     ports:
@@ -29,7 +29,7 @@ services:
       start_period: 10s
 
   worker:
-    image: vivabem:${VERSION:-1.0.0}
+    image: erikcastro255/vivabem:${VERSION:-1.0.0}
     command: ["deno", "task", "worker"]
     restart: unless-stopped
     stop_grace_period: 35s
@@ -64,7 +64,7 @@ services:
       disable: true
 
   web:
-    image: vivabem-web:${VERSION:-1.0.0}
+    image: erikcastro255/vivabem-web:${VERSION:-1.0.0}
     restart: unless-stopped
     depends_on:
       vivabem:
