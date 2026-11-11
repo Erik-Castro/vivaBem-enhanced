@@ -282,7 +282,7 @@ web/               # SPA Svelte 5 + Vite + PWA (Nginx no Compose)
 ## Status
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
-6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração) e 9 (hardening e operação) concluídas —
-versão atual `0.10.0`. Fase 10 (frontend Svelte 5 + Vite/PWA) em andamento com o MVP entregue
-(autenticação, painel, contas, transações e categorias); orçamentos, metas, hábitos, investimentos e
-conquistas ainda são placeholders. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
+6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação) e 10 (frontend
+Svelte 5 + Vite/PWA) concluídas — versão atual `0.11.0`. Todas as telas do frontend foram entregues:
+autenticação, painel, contas, transações, categorias, orçamentos, metas, hábitos, investimentos e
+conquistas. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).

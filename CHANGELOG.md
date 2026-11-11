@@ -7,6 +7,10 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-11
+
+Décima primeira release: frontend completo (Fase 10).
+
 ### Added
 
 - Frontend SPA em `web/` com Svelte 5 (runes), Vite 7, TypeScript strict e PWA:

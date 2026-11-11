@@ -621,10 +621,10 @@ Worker (claim/lease)
 **Total da API: ~31–43 dias.** Frontend completo: ~15–20 dias; o MVP da Fase 10
 cobre fundação, autenticação, painel e finanças.
 
-Fases 0 a 9 concluídas e publicadas de `0.1.0` a `0.10.0`. A Fase 10 está em
-andamento: o MVP (fundação, autenticação, painel, contas, transações,
-categorias, PWA e deploy) e as telas de orçamentos, metas, hábitos, investimentos
-e conquistas foram entregues.
+Fases 0 a 10 concluídas e publicadas de `0.1.0` a `0.11.0`. Todas as telas do
+frontend estão entregues: fundação, autenticação, painel, contas, transações,
+categorias, orçamentos, metas, hábitos, investimentos, conquistas, PWA e
+deploy.
 
 ---
 
