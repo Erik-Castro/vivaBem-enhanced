@@ -140,6 +140,31 @@ export function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] ?? name;
 }
 
+/** Tempo relativo curto em pt-BR; acima de uma semana cai para a data. */
+export function formatRelativeTime(value: string, locale = "pt-BR"): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  const diffMinutes = Math.round((Date.now() - date.getTime()) / 60_000);
+
+  if (Math.abs(diffMinutes) < 1) return "agora";
+
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+
+  if (Math.abs(diffMinutes) < 60) return formatter.format(-diffMinutes, "minute");
+
+  const hours = Math.round(diffMinutes / 60);
+
+  if (Math.abs(hours) < 24) return formatter.format(-hours, "hour");
+
+  const days = Math.round(hours / 24);
+
+  if (Math.abs(days) < 7) return formatter.format(-days, "day");
+
+  return formatDate(value, locale);
+}
+
 export function initials(name: string): string {
   return name
     .trim()

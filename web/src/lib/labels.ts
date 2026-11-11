@@ -8,6 +8,8 @@ import type {
   HabitFrequencyType,
   HabitType,
   InvestmentOperationType,
+  NotificationCategory,
+  NotificationSeverity,
   TransactionType,
 } from "./types";
 
@@ -251,4 +253,42 @@ export function achievementCategoryIcon(category: AchievementCategory): IconName
     achievementCategoryOptions.find((option) => option.value === category)?.icon ??
     "trophy"
   );
+}
+
+export const notificationCategoryOptions: readonly {
+  readonly value: NotificationCategory;
+  readonly label: string;
+  readonly icon: IconName;
+}[] = [
+  { value: "finance", label: "Finanças", icon: "wallet" },
+  { value: "habit", label: "Hábitos", icon: "heart" },
+  { value: "security", label: "Segurança", icon: "lock" },
+  { value: "system", label: "Sistema", icon: "sparkles" },
+  { value: "investment", label: "Investimentos", icon: "piggy" },
+  { value: "family", label: "Família", icon: "users" },
+];
+
+export function notificationCategoryLabel(category: NotificationCategory): string {
+  return (
+    notificationCategoryOptions.find((option) => option.value === category)?.label ??
+    category
+  );
+}
+
+export function notificationCategoryIcon(category: NotificationCategory): IconName {
+  return (
+    notificationCategoryOptions.find((option) => option.value === category)?.icon ??
+    "bell"
+  );
+}
+
+const notificationSeverityLabels: Readonly<Record<NotificationSeverity, string>> = {
+  low: "Baixa",
+  medium: "Média",
+  high: "Alta",
+  critical: "Crítica",
+};
+
+export function notificationSeverityLabel(severity: NotificationSeverity): string {
+  return notificationSeverityLabels[severity];
 }

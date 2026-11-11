@@ -374,3 +374,40 @@ export interface AchievementSummary {
   readonly total: number;
   readonly points: number;
 }
+
+export type NotificationCategory =
+  | "finance"
+  | "habit"
+  | "security"
+  | "system"
+  | "investment"
+  | "family";
+
+export type NotificationSeverity = "low" | "medium" | "high" | "critical";
+
+export interface Notification {
+  readonly id: string;
+  readonly title: string;
+  readonly message: string;
+  readonly category: NotificationCategory;
+  readonly severity: NotificationSeverity;
+  readonly link: string | null;
+  readonly isRead: boolean;
+  readonly createdAt: string;
+}
+
+export interface NotificationListPayload {
+  readonly notifications: Notification[];
+}
+
+export interface NotificationPayload {
+  readonly notification: Notification;
+}
+
+export interface UnreadCountPayload {
+  readonly unread: number;
+}
+
+export interface MarkAllReadPayload {
+  readonly marked: number;
+}

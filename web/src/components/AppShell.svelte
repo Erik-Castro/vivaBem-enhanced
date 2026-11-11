@@ -1,16 +1,27 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { onDestroy, onMount, type Snippet } from "svelte";
   import type { IconName } from "../lib/icons";
   import type { User } from "../lib/types";
   import { auth } from "../lib/auth.svelte";
+  import { notifications } from "../lib/notifications.svelte";
   import { router } from "../lib/router.svelte";
   import { theme } from "../lib/theme.svelte";
   import { toasts } from "../lib/toast.svelte";
   import { initials } from "../lib/format";
   import Icon from "./Icon.svelte";
+  import NotificationBell from "./NotificationBell.svelte";
+  import NotificationPanel from "./NotificationPanel.svelte";
   import ToastHost from "./ToastHost.svelte";
 
   let { user, children }: { user: User; children: Snippet } = $props();
+
+  onMount(() => {
+    notifications.startPolling();
+  });
+
+  onDestroy(() => {
+    notifications.stopPolling();
+  });
 
   interface NavItem {
     readonly path: string;
@@ -28,6 +39,7 @@
     { path: "/habits", label: "Hábitos", icon: "heart" },
     { path: "/investments", label: "Investimentos", icon: "piggy" },
     { path: "/achievements", label: "Conquistas", icon: "trophy" },
+    { path: "/notifications", label: "Notificações", icon: "bell" },
     { path: "/settings", label: "Configurações", icon: "sliders" },
   ];
 
@@ -45,6 +57,7 @@
     "/habits": "Hábitos",
     "/investments": "Investimentos",
     "/achievements": "Conquistas",
+    "/notifications": "Notificações",
   };
 
   const mobilePaths = new Set([
@@ -159,6 +172,7 @@
       </a>
       <h1 class="topbar-title">{currentTitle}</h1>
       <div class="topbar-actions">
+        <NotificationBell />
         <button
           class="btn btn--icon btn--ghost"
           type="button"
@@ -177,6 +191,8 @@
         </a>
       </div>
     </header>
+
+    <NotificationPanel />
 
     <main class="content">
       {@render children()}

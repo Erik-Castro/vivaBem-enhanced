@@ -94,14 +94,17 @@ web/
       router.svelte.ts  # hash router reativo
       theme.svelte.ts   # tema claro/escuro persistido
       toast.svelte.ts   # fila de notificações
+      notifications.svelte.ts # contador, lista recente e painel do sino
       format.ts         # dinheiro (minor units), datas, input
       labels.ts         # rótulos e ícones de domínio
       types.ts          # tipos do contrato da API
       icons.ts          # ícones SVG inline
-    components/         # AppShell, modais, linha de transação, toasts
+    components/         # AppShell, modais, linha de transação, toasts,
+                        # sino e painel de notificações
     pages/              # Login, Register, Dashboard, Accounts, Transactions,
                         # Categories, Budgets, Goals, Habits, Investments,
-                        # Achievements, Settings, ComingSoon, NotFound
+                        # Achievements, Notifications, Settings, ComingSoon,
+                        # NotFound
 ```
 
 ### 4.1 Rotas
@@ -119,6 +122,7 @@ web/
 | `#/habits` | sim | Hábitos, check-in, streaks, calendário e gatilhos |
 | `#/investments` | sim | Carteira, posições, ativos, operações e cotações |
 | `#/achievements` | sim | Catálogo, progresso, pontos, abas por status e busca |
+| `#/notifications` | sim | Lista, abas por leitura, marcar uma/todas e paginação |
 | `#/settings` | sim | Perfil, preferências, sessões e sair |
 | qualquer outra | sim | Página não encontrada |
 
@@ -164,6 +168,25 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
 - Datas de negócio são `YYYY-MM-DD`; a exibição usa `Intl.DateTimeFormat` e o
   fuso do navegador.
 - O formulário de transação envia a data no formato de negócio (sem hora).
+
+### 4.6 Notificações
+
+- `notifications.svelte.ts` mantém o contador de não lidas, as 8 notificações
+  mais recentes do painel do sino e a lista paginada da página (50 por vez).
+- O contador é atualizado no boot e a cada 60s; o polling pausa com a aba
+  oculta e atualiza em `visibilitychange` e `online`. Falhas de polling são
+  silenciosas para não interromper a interface.
+- O sino mostra badge com no máximo `9+` e abre um painel no desktop ou um
+  bottom sheet no mobile; fecha com Escape, clique no backdrop, troca de rota
+  ou ao abrir um item. O layer é renderizado fora do topbar porque o
+  `backdrop-filter` dele cria um containing block para `position: fixed`.
+- Cada item marca como lida ao ser aberto e navega pelo link da API apenas
+  quando a rota existe no SPA: `/finances` vira `/dashboard`, `/budgets/:id`
+  vira `/budgets` e `/settings/sessions` vira `/settings`; `/family` e
+  `/insights` ficam sem navegação até as telas correspondentes existirem.
+- A página `#/notifications` tem abas "Todas" e "Não lidas" (com badge),
+  atualização manual, "Marcar todas como lidas", paginação e estados de vazio
+  e erro.
 
 ---
 

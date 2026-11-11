@@ -16,6 +16,7 @@
   import Achievements from "./pages/Achievements.svelte";
   import Login from "./pages/Login.svelte";
   import NotFound from "./pages/NotFound.svelte";
+  import Notifications from "./pages/Notifications.svelte";
   import Register from "./pages/Register.svelte";
   import Settings from "./pages/Settings.svelte";
   import Transactions from "./pages/Transactions.svelte";
@@ -75,6 +76,8 @@
       <Investments />
     {:else if router.path === "/achievements"}
       <Achievements />
+    {:else if router.path === "/notifications"}
+      <Notifications />
     {:else if router.path === "/settings"}
       <Settings />
     {:else if soon}

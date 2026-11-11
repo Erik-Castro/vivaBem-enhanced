@@ -7,6 +7,26 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added
+
+- Sino de notificações no topbar com badge de não lidas (cap `9+`), painel com
+  as 8 mais recentes (dropdown no desktop, bottom sheet no mobile), marcação
+  de leitura ao abrir e atalho para a central.
+- Página `#/notifications` com abas "Todas"/"Não lidas", contador de não lidas,
+  atualização manual, "Marcar todas como lidas", paginação e estados de vazio
+  e erro.
+- Contador de notificações atualizado no boot e a cada 60s, pausado com a aba
+  oculta e revalidado em `visibilitychange`/`online`.
+- Links de notificação traduzidos para rotas do SPA (`/finances` →
+  `/dashboard`, `/budgets/:id` → `/budgets`, `/settings/sessions` →
+  `/settings`); links sem tela equivalente apenas marcam a leitura.
+
+### Fixed
+
+- Painel do sino fecha ao abrir um item cujo link aponta para a rota atual e
+  usa bottom sheet correto no mobile (o `backdrop-filter` do topbar quebrava
+  o `position: fixed` do layer).
+
 ## [0.11.0] - 2026-11-11
 
 Décima primeira release: frontend completo (Fase 10).
