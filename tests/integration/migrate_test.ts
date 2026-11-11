@@ -1,5 +1,10 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { loadMigrations, migrate, MigrationError } from "../../src/db/migrate.ts";
+import {
+  assertSchemaCurrent,
+  loadMigrations,
+  migrate,
+  MigrationError,
+} from "../../src/db/migrate.ts";
 import { createTestDatabase } from "../helpers/db.ts";
 
 Deno.test("loadMigrations carrega as migrações em ordem", async () => {
@@ -125,6 +130,53 @@ Deno.test("migrate detecta migração aplicada sem arquivo", async () => {
 
     const removed = migrations.filter((migration) => migration.version !== 1);
     assertThrows(() => migrate(testDb.db, removed), MigrationError);
+  } finally {
+    testDb.cleanup();
+  }
+});
+
+Deno.test("assertSchemaCurrent aceita banco migrado", async () => {
+  const testDb = await createTestDatabase();
+
+  try {
+    const migrations = await loadMigrations();
+    assertSchemaCurrent(testDb.db, migrations);
+  } finally {
+    testDb.cleanup();
+  }
+});
+
+Deno.test("assertSchemaCurrent recusa banco não migrado", async () => {
+  const testDb = await createTestDatabase({ migrate: false });
+
+  try {
+    const migrations = await loadMigrations();
+    assertThrows(
+      () => assertSchemaCurrent(testDb.db, migrations),
+      MigrationError,
+      "Banco não migrado",
+    );
+  } finally {
+    testDb.cleanup();
+  }
+});
+
+Deno.test("assertSchemaCurrent recusa schema desatualizado", async () => {
+  const testDb = await createTestDatabase();
+
+  try {
+    const migrations = await loadMigrations();
+    assertThrows(
+      () =>
+        assertSchemaCurrent(testDb.db, [...migrations, {
+          version: 999,
+          name: "999_futura.sql",
+          sql: "SELECT 1;",
+          checksum: "0".repeat(64),
+        }]),
+      MigrationError,
+      "Schema desatualizado",
+    );
   } finally {
     testDb.cleanup();
   }

@@ -1,12 +1,16 @@
 import { assertEquals, assertExists } from "@std/assert";
-import { loadConfig } from "../../src/config.ts";
+import { loadConfig, loadWorkerConfig, type WorkerConfig } from "../../src/config.ts";
 import { createLogger } from "../../src/shared/logger/index.ts";
 import type { AppDatabase } from "../../src/db/client.ts";
 import { EventPublisher } from "../../src/events/event-publisher.ts";
 import { OutboxRepository } from "../../src/events/outbox.repository.ts";
-import { backoffMs, EventWorker } from "../../src/events/worker.ts";
+import { EventPayloadError } from "../../src/events/errors.ts";
+import type { ClaimedEvent } from "../../src/events/events.types.ts";
 import type { AiProcessor } from "../../src/ai/ai.processor.ts";
 import type { CorrelationScheduler } from "../../src/ai/ai.correlation.ts";
+import { WorkerRuntime } from "../../src/worker/runtime.ts";
+import { InsightsRepository } from "../../src/modules/insights/insights.repository.ts";
+import { NotificationsRepository } from "../../src/modules/notifications/notifications.repository.ts";
 import { uuidv7 } from "../../src/shared/utils/uuid.ts";
 import { createTestDatabase, type TestDatabase } from "../helpers/db.ts";
 import { createTestApp } from "../helpers/app.ts";
@@ -22,6 +26,18 @@ const AI_ENV = {
 
 const logger = createLogger({ level: "error", silent: true });
 
+function workerConfig(overrides: Record<string, string> = {}): WorkerConfig {
+  return loadWorkerConfig({
+    WORKER_POLL_INTERVAL_MS: "50",
+    WORKER_HEARTBEAT_MS: "2000",
+    WORKER_LEASE_MS: "60000",
+    WORKER_MAX_ATTEMPTS: "3",
+    WORKER_CONCURRENCY: "1",
+    WORKER_SHUTDOWN_GRACE_MS: "50",
+    ...overrides,
+  });
+}
+
 function createUser(db: AppDatabase, id: string, aiEnabled: boolean): void {
   const now = new Date().toISOString();
   db.prepare<[string, string, string, string]>(
@@ -35,17 +51,20 @@ function createUser(db: AppDatabase, id: string, aiEnabled: boolean): void {
   ).run(id, aiEnabled ? 1 : 0, now);
 }
 
+interface InsertOptions {
+  readonly type?: Parameters<OutboxRepository["insert"]>[0]["type"];
+  readonly priority?: number;
+  readonly availableAt?: string;
+  readonly payload?: Record<string, unknown>;
+  readonly now?: string;
+}
+
 function insertEvent(
   repository: OutboxRepository,
   userId: string,
-  overrides: Partial<{
-    type: Parameters<OutboxRepository["insert"]>[0]["type"];
-    priority: number;
-    availableAt: string;
-    payload: Record<string, unknown>;
-  }> = {},
+  overrides: InsertOptions = {},
 ): string {
-  const now = new Date().toISOString();
+  const now = overrides.now ?? new Date().toISOString();
   const id = uuidv7();
 
   repository.insert({
@@ -77,6 +96,18 @@ async function withDatabase(
   }
 }
 
+function processor(
+  process: (
+    event: ClaimedEvent,
+  ) => Promise<{ processed: boolean; toolCalls: number; executed: number }>,
+): AiProcessor {
+  return { process } as unknown as AiProcessor;
+}
+
+function correlations(maybeSchedule: () => number = () => 0): CorrelationScheduler {
+  return { maybeSchedule } as unknown as CorrelationScheduler;
+}
+
 Deno.test("publisher não grava quando a IA está desligada", async () => {
   await withDatabase((database, userId) => {
     const config = loadConfig({});
@@ -101,7 +132,6 @@ Deno.test("publisher respeita o opt-in do usuário", async () => {
     const config = loadConfig(AI_ENV);
     const publisher = new EventPublisher({ db: database.db, config, logger });
 
-    // A IA está ligada globalmente, mas o usuário não autorizou.
     database.db
       .prepare<[string]>("UPDATE user_preferences SET ai_enabled = 0 WHERE user_id = ?")
       .run(userId);
@@ -138,116 +168,293 @@ Deno.test("publisher respeita o opt-in do usuário", async () => {
   });
 });
 
-Deno.test("claim é atômico e prioriza maior prioridade", async () => {
+Deno.test("claim é atômico, prioriza e cria lease", async () => {
   await withDatabase((database, userId) => {
     const repository = new OutboxRepository(database.db);
     const low = insertEvent(repository, userId, { priority: 0 });
     const high = insertEvent(repository, userId, { priority: 10 });
+    const now = new Date().toISOString();
 
-    const first = repository.claimNext("worker-a", new Date().toISOString());
+    const first = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
     assertExists(first);
     assertEquals(first.id, high);
+    assertEquals(first.workerId, "worker-a");
+    assertEquals(typeof first.leaseToken, "string");
+    assertExists(first.leaseExpiresAt);
 
-    const second = repository.claimNext("worker-b", new Date().toISOString());
+    const second = repository.claimNext({ workerId: "worker-b", now, leaseMs: 60_000 });
     assertExists(second);
     assertEquals(second.id, low);
 
-    // Sem eventos pendentes, o terceiro claim não devolve nada.
-    assertEquals(repository.claimNext("worker-c", new Date().toISOString()), null);
+    assertEquals(repository.claimNext({ workerId: "worker-c", now, leaseMs: 60_000 }), null);
 
-    assertEquals(repository.findById(high)?.status, "processing");
-    assertEquals(repository.findById(high)?.attempts, 1);
-    assertEquals(repository.findById(high)?.workerId, "worker-a");
+    const claimed = repository.findById(high);
+    assertEquals(claimed?.status, "processing");
+    assertEquals(claimed?.attempts, 1);
+    assertEquals(claimed?.workerId, "worker-a");
   });
 });
 
 Deno.test("claim ignora eventos ainda não disponíveis", async () => {
   await withDatabase((database, userId) => {
     const repository = new OutboxRepository(database.db);
-    const future = new Date(Date.now() + 60_000).toISOString();
-    insertEvent(repository, userId, { availableAt: future });
+    insertEvent(repository, userId, {
+      availableAt: new Date(Date.now() + 60_000).toISOString(),
+    });
 
-    assertEquals(repository.claimNext("worker-a", new Date().toISOString()), null);
+    assertEquals(
+      repository.claimNext({
+        workerId: "worker-a",
+        now: new Date().toISOString(),
+        leaseMs: 60_000,
+      }),
+      null,
+    );
     assertEquals(repository.stats().pending, 1);
   });
 });
 
-Deno.test("complete e fail controlam o ciclo de vida do evento", async () => {
+Deno.test("complete só confirma a concessão corrente", async () => {
   await withDatabase((database, userId) => {
     const repository = new OutboxRepository(database.db);
-    const completedId = insertEvent(repository, userId);
+    const id = insertEvent(repository, userId);
+    const now = new Date().toISOString();
+
+    const event = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    assertExists(event);
+
+    assertEquals(repository.complete(id, "worker-a", "token-errado", now), false);
+    assertEquals(repository.complete(id, "worker-a", event.leaseToken, now), true);
+    assertEquals(repository.findById(id)?.status, "completed");
+    assertEquals(repository.findById(id)?.lockedAt, null);
+    assertExists(repository.findById(id)?.processedAt);
+  });
+});
+
+Deno.test("fail agenda retry com backoff e limite de tentativas", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
     const retryId = insertEvent(repository, userId);
     const deadId = insertEvent(repository, userId);
-
     const now = new Date().toISOString();
-    const completed = repository.claimNext("worker-a", now);
-    assertExists(completed);
-    repository.complete(completed.id, now);
-    assertEquals(repository.findById(completedId)?.status, "completed");
-    assertEquals(repository.findById(completedId)?.lockedAt, null);
+    const next = new Date(Date.now() + 5_000).toISOString();
 
-    const retryEvent = repository.claimNext("worker-a", now);
+    const retryEvent = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
     assertExists(retryEvent);
-    const willRetry = repository.fail(
-      retryEvent,
-      "provider indisponível",
-      now,
-      new Date(Date.now() + 5_000).toISOString(),
-      3,
+    assertEquals(
+      repository.fail(retryEvent, {
+        error: "provider indisponível",
+        now,
+        nextAvailableAt: next,
+        maxAttempts: 3,
+      }),
+      "retry",
     );
-    assertEquals(willRetry, true);
     const retried = repository.findById(retryId);
     assertEquals(retried?.status, "pending");
     assertEquals(retried?.lastError, "provider indisponível");
     assertEquals(retried?.attempts, 1);
+    assertEquals(retried?.lockedAt, null);
+    assertEquals(retried?.availableAt, next);
 
-    const deadEvent = repository.claimNext("worker-a", now);
+    const deadEvent = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
     assertExists(deadEvent);
-    const deadWillRetry = repository.fail(
-      deadEvent,
-      "erro definitivo",
-      now,
-      now,
-      1,
+    assertEquals(
+      repository.fail(deadEvent, {
+        error: "erro definitivo",
+        now,
+        nextAvailableAt: next,
+        maxAttempts: 1,
+      }),
+      "dead_letter",
     );
-    assertEquals(deadWillRetry, false);
-    assertEquals(repository.findById(deadId)?.status, "failed");
+    assertEquals(repository.findById(deadId)?.status, "dead_letter");
+    assertExists(repository.findById(deadId)?.processedAt);
   });
 });
 
-Deno.test("recoverStuck devolve lease vencido e mata tentativas esgotadas", async () => {
+Deno.test("falha permanente vai direto para dead letter", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const id = insertEvent(repository, userId);
+    const now = new Date().toISOString();
+
+    const event = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    assertExists(event);
+
+    assertEquals(
+      repository.fail(event, {
+        error: "payload inválido",
+        now,
+        nextAvailableAt: now,
+        maxAttempts: 10,
+        permanent: true,
+      }),
+      "dead_letter",
+    );
+    assertEquals(repository.findById(id)?.status, "dead_letter");
+  });
+});
+
+Deno.test("fail de concessão perdida não sobrescreve o evento", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const id = insertEvent(repository, userId);
+    const now = new Date().toISOString();
+
+    const event = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    assertExists(event);
+
+    database.db
+      .prepare<[string]>("UPDATE event_outbox SET lease_token = 'outro' WHERE id = ?")
+      .run(id);
+
+    assertEquals(
+      repository.fail(event, {
+        error: "x",
+        now,
+        nextAvailableAt: now,
+        maxAttempts: 10,
+      }),
+      "lost",
+    );
+    assertEquals(repository.findById(id)?.status, "processing");
+  });
+});
+
+Deno.test("renewLease estende apenas a concessão corrente", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const id = insertEvent(repository, userId);
+    const now = new Date().toISOString();
+
+    const event = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    assertExists(event);
+
+    const extended = new Date(new Date(now).getTime() + 120_000).toISOString();
+    assertEquals(
+      repository.renewLease(id, "worker-a", "token-errado", now, 120_000),
+      false,
+    );
+    assertEquals(repository.renewLease(id, "worker-a", event.leaseToken, now, 120_000), true);
+    assertEquals(repository.findById(id)?.leaseExpiresAt, extended);
+  });
+});
+
+Deno.test("recoverExpired devolve lease vencido e mata tentativas esgotadas", async () => {
   await withDatabase((database, userId) => {
     const repository = new OutboxRepository(database.db);
     const retryId = insertEvent(repository, userId);
     const deadId = insertEvent(repository, userId);
+    const now = new Date().toISOString();
 
-    const old = new Date(Date.now() - 10 * 60_000).toISOString();
-    const claimedAt = new Date().toISOString();
-    const first = repository.claimNext("worker-a", claimedAt);
+    const first = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    const second = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
     assertExists(first);
-    const second = repository.claimNext("worker-a", claimedAt);
     assertExists(second);
 
-    // Simula leases vencidos: ambos os eventos foram reivindicados há 10 min.
+    const past = new Date(Date.now() - 60_000).toISOString();
     database.db
       .prepare<[string, string, string]>(
-        "UPDATE event_outbox SET locked_at = ? WHERE id IN (?, ?)",
+        "UPDATE event_outbox SET lease_expires_at = ? WHERE id IN (?, ?)",
       )
-      .run(old, retryId, deadId);
-
-    // Força o segundo evento a já ter esgotado as tentativas.
+      .run(past, retryId, deadId);
     database.db
       .prepare<[number, string]>("UPDATE event_outbox SET attempts = ? WHERE id = ?")
-      .run(2, deadId);
+      .run(3, deadId);
 
-    const now = new Date().toISOString();
-    const cutoff = new Date(Date.now() - 60_000).toISOString();
-    const recovered = repository.recoverStuck(cutoff, now, 2);
+    const recovered = repository.recoverExpired({ now, maxAttempts: 3, leaseMs: 60_000 });
 
-    assertEquals(recovered, 2);
+    assertEquals(recovered, { retried: 1, deadLettered: 1 });
     assertEquals(repository.findById(retryId)?.status, "pending");
     assertEquals(repository.findById(retryId)?.lastError, "lease expirado");
-    assertEquals(repository.findById(deadId)?.status, "failed");
+    assertEquals(repository.findById(deadId)?.status, "dead_letter");
+  });
+});
+
+Deno.test("recoverExpired trata linha legada sem lease", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const id = insertEvent(repository, userId);
+    const now = new Date().toISOString();
+
+    assertExists(repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 }));
+
+    const past = new Date(Date.now() - 10 * 60_000).toISOString();
+    database.db
+      .prepare<[string, string]>(
+        "UPDATE event_outbox SET lease_token = NULL, lease_expires_at = NULL, locked_at = ? WHERE id = ?",
+      )
+      .run(past, id);
+
+    const recovered = repository.recoverExpired({ now, maxAttempts: 3, leaseMs: 60_000 });
+
+    assertEquals(recovered.retried, 1);
+    assertEquals(repository.findById(id)?.status, "pending");
+  });
+});
+
+Deno.test("replay reenfileira eventos terminais e audita", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const id = insertEvent(repository, userId);
+    const now = new Date().toISOString();
+
+    const event = repository.claimNext({ workerId: "worker-a", now, leaseMs: 60_000 });
+    assertExists(event);
+
+    // Ainda em processamento: replay exige --force.
+    assertEquals(repository.replay(id, now), "processing");
+
+    repository.fail(event, {
+      error: "falha definitiva",
+      now,
+      nextAvailableAt: now,
+      maxAttempts: 1,
+    });
+    assertEquals(repository.findById(id)?.status, "dead_letter");
+
+    assertEquals(repository.replay(id, now), "replayed");
+    const replayed = repository.findById(id);
+    assertEquals(replayed?.status, "pending");
+    assertEquals(replayed?.attempts, 0);
+    assertEquals(replayed?.replayCount, 1);
+    assertEquals(replayed?.replayedAt, now);
+    assertEquals(replayed?.processedAt, null);
+    assertEquals(replayed?.lockedAt, null);
+
+    assertEquals(repository.replay(uuidv7(), now), "not_found");
+  });
+});
+
+Deno.test("replay recusa eventos não terminais sem force", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const id = insertEvent(repository, userId);
+    const now = new Date().toISOString();
+
+    assertEquals(repository.replay(id, now), "not_replayable");
+    assertEquals(repository.replay(id, now, true), "replayed");
+    assertEquals(repository.findById(id)?.status, "pending");
+  });
+});
+
+Deno.test("stats e idade do pendente mais antigo", async () => {
+  await withDatabase((database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const old = new Date(Date.now() - 120_000).toISOString();
+    insertEvent(repository, userId, { now: old, availableAt: old });
+    insertEvent(repository, userId);
+
+    const stats = repository.stats();
+    assertEquals(stats.pending, 2);
+    assertEquals(stats.processing, 0);
+    assertEquals(stats.completed, 0);
+    assertEquals(stats.failed, 0);
+    assertEquals(stats.deadLetter, 0);
+
+    const age = repository.oldestPendingAgeSeconds(new Date().toISOString());
+    assertEquals(age >= 120, true);
   });
 });
 
@@ -258,167 +465,265 @@ Deno.test("hasActiveOfType detecta apenas eventos em andamento", async () => {
 
     assertEquals(repository.hasActiveOfType(userId, "finance.transaction.created"), true);
 
-    const event = repository.claimNext("worker-a", new Date().toISOString());
+    const event = repository.claimNext({
+      workerId: "worker-a",
+      now: new Date().toISOString(),
+      leaseMs: 60_000,
+    });
     assertExists(event);
-    repository.complete(id, new Date().toISOString());
+    repository.complete(id, event.workerId, event.leaseToken, new Date().toISOString());
 
     assertEquals(repository.hasActiveOfType(userId, "finance.transaction.created"), false);
     assertEquals(repository.hasActiveOfType(userId, "habit.log.created"), false);
   });
 });
 
-Deno.test("backoff cresce exponencialmente e para em 5 minutos", () => {
-  assertEquals(backoffMs(1), 5_000);
-  assertEquals(backoffMs(2), 10_000);
-  assertEquals(backoffMs(3), 20_000);
-  assertEquals(backoffMs(20), 5 * 60_000);
-});
-
-Deno.test("worker completa o evento e agenda correlação", async () => {
+Deno.test("runtime completa o evento e agenda correlação", async () => {
   await withDatabase(async (database, userId) => {
     const repository = new OutboxRepository(database.db);
-    const config = loadConfig({ AI_MAX_RETRIES: "3" });
     const id = insertEvent(repository, userId);
 
     let scheduled = 0;
-    const worker = new EventWorker({
+    const runtime = new WorkerRuntime({
       db: database.db,
-      config,
+      config: workerConfig(),
       logger,
       repository,
-      processor: {
-        process: () => Promise.resolve({ processed: true, toolCalls: 0, executed: 0 }),
-      } as unknown as AiProcessor,
-      correlations: {
-        maybeSchedule: () => {
-          scheduled++;
-          return 0;
-        },
-      } as unknown as CorrelationScheduler,
+      processor: processor(() => Promise.resolve({ processed: true, toolCalls: 1, executed: 1 })),
+      correlations: correlations(() => ++scheduled),
     });
 
-    const processed = await worker.runOnce();
+    const processed = await runtime.runOnce();
 
     assertEquals(processed, 1);
     assertEquals(scheduled, 1);
-    const event = repository.findById(id);
-    assertEquals(event?.status, "completed");
-    assertExists(event?.processedAt);
+    assertEquals(repository.findById(id)?.status, "completed");
+    assertExists(repository.findById(id)?.processedAt);
   });
 });
 
-Deno.test("worker não agenda correlação para eventos internos", async () => {
+Deno.test("runtime não agenda correlação para eventos internos", async () => {
   await withDatabase(async (database, userId) => {
     const repository = new OutboxRepository(database.db);
-    const config = loadConfig({});
-    insertEvent(repository, userId, { type: "correlation.check" });
+    insertEvent(repository, userId, { type: "correlation.check", payload: { patternType: "x" } });
 
     let scheduled = 0;
-    const worker = new EventWorker({
+    const runtime = new WorkerRuntime({
       db: database.db,
-      config,
+      config: workerConfig(),
       logger,
       repository,
-      processor: {
-        process: () => Promise.resolve({ processed: true, toolCalls: 0, executed: 0 }),
-      } as unknown as AiProcessor,
-      correlations: {
-        maybeSchedule: () => {
-          scheduled++;
-          return 0;
-        },
-      } as unknown as CorrelationScheduler,
+      processor: processor(() => Promise.resolve({ processed: true, toolCalls: 0, executed: 0 })),
+      correlations: correlations(() => ++scheduled),
     });
 
-    await worker.runOnce();
+    await runtime.runOnce();
     assertEquals(scheduled, 0);
   });
 });
 
-Deno.test("worker reagenda falha com backoff", async () => {
+Deno.test("runtime reagenda falha transitória com backoff", async () => {
   await withDatabase(async (database, userId) => {
     const repository = new OutboxRepository(database.db);
-    const config = loadConfig({ AI_MAX_RETRIES: "3" });
     const id = insertEvent(repository, userId);
+    const startedAt = new Date();
 
-    const worker = new EventWorker({
+    const runtime = new WorkerRuntime({
       db: database.db,
-      config,
+      config: workerConfig(),
       logger,
       repository,
-      processor: {
-        process: () => Promise.reject(new Error("provider fora do ar")),
-      } as unknown as AiProcessor,
-      correlations: {
-        maybeSchedule: () => 0,
-      } as unknown as CorrelationScheduler,
+      processor: processor(() => Promise.reject(new Error("provider fora do ar"))),
+      correlations: correlations(),
+      random: () => 0,
     });
 
-    const processed = await worker.runOnce();
+    assertEquals(await runtime.runOnce(), 1);
 
-    assertEquals(processed, 1);
     const event = repository.findById(id);
     assertEquals(event?.status, "pending");
     assertEquals(event?.attempts, 1);
     assertEquals(event?.lastError, "provider fora do ar");
     assertExists(event?.availableAt);
+    assertEquals(new Date(event.availableAt).getTime() - startedAt.getTime() >= 5_000, true);
   });
 });
 
-Deno.test("worker envia para dead-letter quando as tentativas acabam", async () => {
+Deno.test("runtime envia falha permanente direto para dead letter", async () => {
   await withDatabase(async (database, userId) => {
     const repository = new OutboxRepository(database.db);
-    const config = loadConfig({ AI_MAX_RETRIES: "0" });
     const id = insertEvent(repository, userId);
 
-    const worker = new EventWorker({
+    const runtime = new WorkerRuntime({
       db: database.db,
-      config,
+      config: workerConfig({ WORKER_MAX_ATTEMPTS: "5" }),
       logger,
       repository,
-      processor: {
-        process: () => Promise.reject(new Error("falha definitiva")),
-      } as unknown as AiProcessor,
-      correlations: {
-        maybeSchedule: () => 0,
-      } as unknown as CorrelationScheduler,
+      processor: processor(() => Promise.reject(new EventPayloadError("payload inválido"))),
+      correlations: correlations(),
     });
 
-    await worker.runOnce();
+    await runtime.runOnce();
 
     const event = repository.findById(id);
-    assertEquals(event?.status, "failed");
+    assertEquals(event?.status, "dead_letter");
+    assertEquals(event?.attempts, 1);
+    assertEquals(event?.lastError, "payload inválido");
+  });
+});
+
+Deno.test("runtime envia para dead letter quando as tentativas acabam", async () => {
+  await withDatabase(async (database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    const id = insertEvent(repository, userId);
+
+    const runtime = new WorkerRuntime({
+      db: database.db,
+      config: workerConfig({ WORKER_MAX_ATTEMPTS: "1" }),
+      logger,
+      repository,
+      processor: processor(() => Promise.reject(new Error("falha definitiva"))),
+      correlations: correlations(),
+    });
+
+    await runtime.runOnce();
+
+    const event = repository.findById(id);
+    assertEquals(event?.status, "dead_letter");
     assertEquals(event?.attempts, 1);
     assertEquals(event?.lastError, "falha definitiva");
   });
 });
 
-Deno.test("worker processa no máximo o tamanho do lote", async () => {
+Deno.test("runtime não confirma evento cujo lease foi perdido", async () => {
   await withDatabase(async (database, userId) => {
     const repository = new OutboxRepository(database.db);
-    const config = loadConfig({ AI_MAX_EVENTS_PER_BATCH: "2" });
-    insertEvent(repository, userId);
-    insertEvent(repository, userId);
-    insertEvent(repository, userId);
+    const id = insertEvent(repository, userId);
 
-    const worker = new EventWorker({
+    const runtime = new WorkerRuntime({
       db: database.db,
-      config,
+      config: workerConfig(),
       logger,
       repository,
-      processor: {
-        process: () => Promise.resolve({ processed: true, toolCalls: 0, executed: 0 }),
-      } as unknown as AiProcessor,
-      correlations: {
-        maybeSchedule: () => 0,
-      } as unknown as CorrelationScheduler,
+      processor: processor((event) => {
+        // Outra instância recuperou o evento durante o processamento.
+        database.db
+          .prepare<[string]>("UPDATE event_outbox SET lease_token = 'outro' WHERE id = ?")
+          .run(event.id);
+        return Promise.resolve({ processed: true, toolCalls: 0, executed: 0 });
+      }),
+      correlations: correlations(),
     });
 
-    const processed = await worker.runOnce();
+    await runtime.runOnce();
 
-    assertEquals(processed, 2);
+    const event = repository.findById(id);
+    assertEquals(event?.status, "processing");
+    assertEquals(event?.processedAt, null);
+  });
+});
+
+Deno.test("runtime processa no máximo o tamanho do lote", async () => {
+  await withDatabase(async (database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    insertEvent(repository, userId);
+    insertEvent(repository, userId);
+    insertEvent(repository, userId);
+
+    const runtime = new WorkerRuntime({
+      db: database.db,
+      config: workerConfig({ AI_MAX_EVENTS_PER_BATCH: "2" }),
+      logger,
+      repository,
+      processor: processor(() => Promise.resolve({ processed: true, toolCalls: 0, executed: 0 })),
+      correlations: correlations(),
+    });
+
+    assertEquals(await runtime.runOnce(), 2);
     assertEquals(repository.stats().completed, 2);
     assertEquals(repository.stats().pending, 1);
+  });
+});
+
+Deno.test("runtime respeita a concorrência configurada", async () => {
+  await withDatabase(async (database, userId) => {
+    const repository = new OutboxRepository(database.db);
+    insertEvent(repository, userId);
+    insertEvent(repository, userId);
+
+    let inFlight = 0;
+    let maxInFlight = 0;
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const runtime = new WorkerRuntime({
+      db: database.db,
+      config: workerConfig({ WORKER_CONCURRENCY: "2", AI_MAX_EVENTS_PER_BATCH: "10" }),
+      logger,
+      repository,
+      processor: processor(async () => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        if (maxInFlight < 2) {
+          await gate;
+        } else {
+          release();
+        }
+        inFlight--;
+        return { processed: true, toolCalls: 0, executed: 0 };
+      }),
+      correlations: correlations(),
+    });
+
+    assertEquals(await runtime.runOnce(), 2);
+    assertEquals(maxInFlight, 2);
+    assertEquals(repository.stats().completed, 2);
+  });
+});
+
+Deno.test("dedupe de insights e notificações usa a chave do evento", async () => {
+  await withDatabase((database, userId) => {
+    const insights = new InsightsRepository(database.db);
+    const notifications = new NotificationsRepository(database.db);
+    const now = new Date().toISOString();
+    const record = {
+      category: "finance" as const,
+      severity: "low" as const,
+      title: "Gasto atípico",
+      message: "Mensagem",
+      sourceEvent: "finance.transaction.created",
+      confidence: 0.9,
+      now,
+      dedupeKey: "evento-1:Gasto atípico",
+    };
+
+    assertEquals(insights.createIfAbsent({ id: uuidv7(), userId, ...record }).created, true);
+    assertEquals(insights.createIfAbsent({ id: uuidv7(), userId, ...record }).created, false);
+
+    // Chave nula mantém o comportamento antigo: não deduplica.
+    const noKey = { ...record, dedupeKey: null };
+    assertEquals(insights.createIfAbsent({ id: uuidv7(), userId, ...noKey }).created, true);
+    assertEquals(insights.createIfAbsent({ id: uuidv7(), userId, ...noKey }).created, true);
+
+    const notification = {
+      title: "Alerta",
+      message: "Mensagem",
+      category: "finance" as const,
+      severity: "high" as const,
+      link: null,
+      now,
+      dedupeKey: "evento-1:Alerta",
+    };
+    assertEquals(
+      notifications.createIfAbsent({ id: uuidv7(), userId, ...notification }).created,
+      true,
+    );
+    assertEquals(
+      notifications.createIfAbsent({ id: uuidv7(), userId, ...notification }).created,
+      false,
+    );
   });
 });
 

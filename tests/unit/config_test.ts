@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { ConfigError, loadConfig } from "../../src/config.ts";
+import { ConfigError, loadConfig, loadWorkerConfig } from "../../src/config.ts";
 
 Deno.test("config usa defaults de desenvolvimento", () => {
   const config = loadConfig({});
@@ -77,4 +77,53 @@ Deno.test("IA habilitada com configuração completa", () => {
   assertEquals(config.ai.enabled, true);
   assertEquals(config.ai.provider, "openai");
   assertEquals(config.ai.embeddingDimensions, 768);
+});
+
+Deno.test("worker herda AI_* e aplica defaults próprios", () => {
+  const config = loadWorkerConfig({
+    AI_WORKER_INTERVAL: "1500",
+    AI_MAX_RETRIES: "4",
+    AI_REQUEST_TIMEOUT: "30000",
+  });
+
+  assertEquals(config.worker.id, undefined);
+  assertEquals(config.worker.pollIntervalMs, 1_500);
+  assertEquals(config.worker.leaseMs, 60_000);
+  assertEquals(config.worker.heartbeatMs, 15_000);
+  assertEquals(config.worker.maxAttempts, 5);
+  assertEquals(config.worker.concurrency, 1);
+  assertEquals(config.worker.shutdownGraceMs, 30_000);
+  assertEquals(config.worker.maxEventsPerBatch, 10);
+});
+
+Deno.test("worker aceita WORKER_* explícitos", () => {
+  const config = loadWorkerConfig({
+    WORKER_ID: "worker-01",
+    WORKER_POLL_INTERVAL_MS: "250",
+    WORKER_LEASE_MS: "90000",
+    WORKER_HEARTBEAT_MS: "10000",
+    WORKER_MAX_ATTEMPTS: "2",
+    WORKER_CONCURRENCY: "3",
+    WORKER_SHUTDOWN_GRACE_MS: "1000",
+  });
+
+  assertEquals(config.worker.id, "worker-01");
+  assertEquals(config.worker.pollIntervalMs, 250);
+  assertEquals(config.worker.leaseMs, 90_000);
+  assertEquals(config.worker.heartbeatMs, 10_000);
+  assertEquals(config.worker.maxAttempts, 2);
+  assertEquals(config.worker.concurrency, 3);
+  assertEquals(config.worker.shutdownGraceMs, 1_000);
+});
+
+Deno.test("worker exige heartbeat menor que o lease", () => {
+  assertThrows(
+    () => loadWorkerConfig({ WORKER_HEARTBEAT_MS: "60000", WORKER_LEASE_MS: "60000" }),
+    ConfigError,
+  );
+});
+
+Deno.test("worker rejeita concorrência fora da faixa", () => {
+  assertThrows(() => loadWorkerConfig({ WORKER_CONCURRENCY: "9" }), ConfigError);
+  assertThrows(() => loadWorkerConfig({ WORKER_CONCURRENCY: "0" }), ConfigError);
 });
