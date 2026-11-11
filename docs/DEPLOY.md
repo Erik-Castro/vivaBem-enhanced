@@ -16,6 +16,8 @@ cp .env.example .env
 # Edite pelo menos APP_ORIGIN e JWT_SECRET (mínimo 32 caracteres).
 # Gere um segredo forte com: openssl rand -base64 48
 # Em HTTP local use APP_ORIGIN=http://localhost:8080 e COOKIE_SECURE=false.
+# O exemplo vem com AI_ENABLED=true usando Ollama local: em produção defina
+# AI_ENABLED=false (a IA é opt-in por usuário) ou configure um provider com chave.
 
 make deploy        # equivale a: docker compose up -d --build
 make logs          # acompanha os logs
@@ -89,7 +91,7 @@ do frontend precisa ser igual a `APP_ORIGIN` da API.
 | `WEB_PORT` | não | Porta publicada do frontend no Compose (padrão 8080) |
 | `RATE_LIMIT_AUTH_MAX` | não | Padrão 5/min por IP e por e-mail |
 | `RATE_LIMIT_DATA_MAX` | não | Padrão 30/min para import/export |
-| `AI_ENABLED` | não | Padrão `false`; opt-in por usuário |
+| `AI_ENABLED` | não | Defina `false` em produção; o `.env.example` liga com Ollama local |
 | `LOG_LEVEL` | não | `info` em produção |
 
 Lista completa: `.env.example`.

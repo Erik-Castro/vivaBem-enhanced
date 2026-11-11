@@ -33,8 +33,16 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `/dashboard`, `/budgets/:id` → `/budgets`, `/settings/sessions` →
   `/settings`); links sem tela equivalente apenas marcam a leitura.
 
+### Changed
+
+- `.env.example` liga a IA (`AI_ENABLED=true`) com Ollama local: `qwen3.5:2b`
+  para chat e `nomic-embed-text` para embeddings (768 dimensões). Em produção
+  defina `AI_ENABLED=false`; a IA continua opt-in por usuário.
+
 ### Fixed
 
+- `deno task dev` carrega `.env.example`; a task usava `--env-file-if-exists`,
+  flag inexistente no Deno 2.9.8, e falhava antes de iniciar o servidor.
 - Painel do sino fecha ao abrir um item cujo link aponta para a rota atual e
   usa bottom sheet correto no mobile (o `backdrop-filter` do topbar quebrava
   o `position: fixed` do layer).

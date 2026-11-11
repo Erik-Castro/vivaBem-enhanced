@@ -115,7 +115,7 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 ### 4.1 Comandos disponíveis
 
 ```bash
-deno task dev            # servidor com watch (carrega .env se existir)
+deno task dev            # servidor com watch (carrega .env.example)
 deno task start          # servidor
 deno task test           # suíte completa (tests/)
 deno task test:coverage  # testes com cobertura

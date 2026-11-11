@@ -35,10 +35,12 @@ leitura).
 ## Quick start
 
 ```bash
-cp .env.example .env
 deno install
 deno task dev
 ```
+
+`deno task dev` carrega o `.env.example` automaticamente — não é preciso criar `.env`. Variáveis
+exportadas no shell têm precedência sobre o arquivo (por exemplo, `JWT_SECRET=... deno task dev`).
 
 Servidor em `http://localhost:3000`:
 
@@ -188,29 +190,43 @@ Ou use o `Makefile`: `make help`.
 
 Todas as variáveis estão em [`.env.example`](.env.example). Destaques:
 
-| Variável                | Padrão                  | Observação                                   |
-| ----------------------- | ----------------------- | -------------------------------------------- |
-| `PORT`                  | `3000`                  |                                              |
-| `ENV`                   | `development`           | `development`, `test`, `production`          |
-| `DATABASE_PATH`         | `./data/app.db`         | Use `/app/data/app.db` no Docker             |
-| `APP_ORIGIN`            | `http://localhost:3000` | Origem exata do frontend (CORS/CSRF)         |
-| `WEB_PORT`              | `8080`                  | Porta publicada do container web no Compose  |
-| `JWT_SECRET`            | —                       | **Obrigatório em produção** (32+ caracteres) |
-| `RATE_LIMIT_AUTH_MAX`   | `5`                     | Tentativas por minuto em autenticação        |
-| `RATE_LIMIT_DATA_MAX`   | `30`                    | Chamadas por minuto em import/export         |
-| `AI_ENABLED`            | `false`                 | IA é opt-in por usuário                      |
-| `AI_PROVIDER`           | `openai`                | `openai` (compatível) ou `ollama`            |
-| `VECTOR_EXTENSION_PATH` | —                       | Sobrescreve o binário do `sqlite-vector`     |
+| Variável                | Padrão                   | Observação                                                 |
+| ----------------------- | ------------------------ | ---------------------------------------------------------- |
+| `PORT`                  | `3000`                   |                                                            |
+| `ENV`                   | `development`            | `development`, `test`, `production`                        |
+| `DATABASE_PATH`         | `./data/app.db`          | Use `/app/data/app.db` no Docker                           |
+| `APP_ORIGIN`            | `http://localhost:3000`  | Origem exata do frontend (CORS/CSRF)                       |
+| `WEB_PORT`              | `8080`                   | Porta publicada do container web no Compose                |
+| `JWT_SECRET`            | —                        | **Obrigatório em produção** (32+ caracteres)               |
+| `RATE_LIMIT_AUTH_MAX`   | `5`                      | Tentativas por minuto em autenticação                      |
+| `RATE_LIMIT_DATA_MAX`   | `30`                     | Chamadas por minuto em import/export                       |
+| `AI_ENABLED`            | `false`                  | O `.env.example` liga com Ollama local; opt-in por usuário |
+| `AI_PROVIDER`           | `openai`                 | `openai` (compatível) ou `ollama`                          |
+| `AI_MODEL`              | —                        | Modelo de chat do Ollama (ex.: `qwen3.5:2b`)               |
+| `AI_OLLAMA_URL`         | `http://localhost:11434` | Endpoint do Ollama                                         |
+| `VECTOR_EXTENSION_PATH` | —                        | Sobrescreve o binário do `sqlite-vector`                   |
 
 Nenhum segredo tem valor padrão em produção. Em dev, um segredo efêmero é gerado no boot (com aviso
 no log).
+
+### IA local (Ollama)
+
+O `.env.example` já vem com `AI_ENABLED=true` e `AI_PROVIDER=ollama`, usando `qwen3.5:2b` para chat
+e `nomic-embed-text` para embeddings (768 dimensões). Outros modelos locais (`gemma4:e2b`,
+`ornith-1.5:9b`, `lfm3-omni`, ...) podem ser usados trocando `AI_MODEL`; confira os disponíveis com
+`ollama list`.
+
+A IA continua opt-in por usuário: depois do login, ative "Inteligência artificial" em `#/settings`.
+Sem isso nenhum evento entra no outbox. Em produção, defina `AI_ENABLED=false` (ou configure um
+provider com chave).
 
 ## Docker
 
 Deploy em um comando com Compose (build da API + frontend, volumes e healthcheck):
 
 ```bash
-cp .env.example .env   # defina APP_ORIGIN, JWT_SECRET e, em HTTP local, COOKIE_SECURE=false
+cp .env.example .env   # defina APP_ORIGIN e JWT_SECRET; em HTTP local, COOKIE_SECURE=false
+# Em produção mantenha AI_ENABLED=false (o exemplo liga a IA com Ollama local).
 make deploy            # docker compose up -d --build
 curl -fsS http://127.0.0.1:3000/ready
 ```
