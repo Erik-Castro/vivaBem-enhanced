@@ -16,7 +16,7 @@ COPY bin ./bin
 COPY scripts ./scripts
 COPY CHANGELOG.md ./
 
-RUN deno check src/main.ts
+RUN deno check src/main.ts src/worker/main.ts
 
 # ---------- runtime ----------
 FROM denoland/deno:${DENO_VERSION} AS runtime

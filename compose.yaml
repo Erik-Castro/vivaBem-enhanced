@@ -36,6 +36,54 @@ services:
       retries: 3
       start_period: 10s
 
+  worker:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-0.11.0}
+    image: vivabem:${VERSION:-0.11.0}
+    # Mesma imagem, entry point diferente: o worker só consome a outbox.
+    command: ["deno", "task", "worker"]
+    restart: unless-stopped
+    # Precisa ser maior que WORKER_SHUTDOWN_GRACE_MS para o stop gracioso
+    # terminar antes do SIGKILL.
+    stop_grace_period: 35s
+    # Sem IA habilitada não há consumo de eventos: o serviço só sobe com
+    # `docker compose --profile ai up`. A API funciona sem ele.
+    profiles: ["ai"]
+    environment:
+      ENV: production
+      DATABASE_PATH: /app/data/app.db
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AI_ENABLED: ${AI_ENABLED:-true}
+      # Em container, Ollama no host costuma ser http://host.docker.internal:11434
+      AI_PROVIDER: ${AI_PROVIDER:-ollama}
+      AI_OLLAMA_URL: ${AI_OLLAMA_URL:-http://host.docker.internal:11434}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_REQUEST_TIMEOUT: ${AI_REQUEST_TIMEOUT:-60000}
+      AI_API_BASE_URL: ${AI_API_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_API_MODEL_CHAT_NAME: ${AI_API_MODEL_CHAT_NAME:-}
+      AI_API_MODEL_EMBEDDINGS_NAME: ${AI_API_MODEL_EMBEDDINGS_NAME:?defina AI_API_MODEL_EMBEDDINGS_NAME}
+      AI_EMBEDDING_DIMENSIONS: ${AI_EMBEDDING_DIMENSIONS:?defina AI_EMBEDDING_DIMENSIONS}
+      AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-0.7}
+      AI_MAX_EVENTS_PER_BATCH: ${AI_MAX_EVENTS_PER_BATCH:-10}
+      AI_CORRELATION_THRESHOLD: ${AI_CORRELATION_THRESHOLD:-50}
+      WORKER_ID: ${WORKER_ID:-worker-01}
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-1000}
+      WORKER_LEASE_MS: ${WORKER_LEASE_MS:-60000}
+      WORKER_HEARTBEAT_MS: ${WORKER_HEARTBEAT_MS:-15000}
+      WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-5}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      WORKER_SHUTDOWN_GRACE_MS: ${WORKER_SHUTDOWN_GRACE_MS:-30000}
+    volumes:
+      # Exatamente o mesmo arquivo SQLite da API (WAL + busy_timeout).
+      - vivabem-data:/app/data
+    # Sem healthcheck HTTP: o worker não abre porta. Se a API ainda não migrou
+    # o schema, ele encerra com erro e o restart o reinicia até o banco estar ok.
+    healthcheck:
+      disable: true
+
   web:
     build:
       context: ./web
