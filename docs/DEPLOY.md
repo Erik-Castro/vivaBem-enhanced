@@ -168,6 +168,11 @@ make deploy
 curl -fsS http://127.0.0.1:3000/ready
 ```
 
+Confirme `"database":"ok"` e que `migrations` corresponde ao número de arquivos em
+`src/db/migrations` — o `/ready` reporta a contagem, não valida o schema. Depois
+faça login com um usuário que já existia: se a sessão abrir, o restore está
+íntegro.
+
 O `compose.yaml` fixa os nomes `vivabem-data` e `vivabem-backups`, então os
 comandos de restore continuam válidos mesmo se a stack for renomeada.
 

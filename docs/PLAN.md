@@ -877,8 +877,22 @@ Especificação: [`Worker_Migrations_Spec.md`](Worker_Migrations_Spec.md).
 
 ### 18.2 Pendente
 
-- Build/validação das imagens no CI (Docker não disponível em todo ambiente
-  local).
 - Painel operacional de outbox (hoje a inspeção é pela CLI e pelos logs
   `worker_stats`).
+
+### 18.3 Operação validada
+
+O runbook foi ensaiado em 2026-11-11 com banco real e `WAL` ativo:
+
+- `db:backup` a quente gerou o snapshot; o restore em arquivo separado subiu com
+  `/ready` 200 (`migrations: 10`) e o login de um usuário existente devolveu o
+  mesmo `id`.
+- Worker com banco novo encerra com código 1 em "Banco não migrado"; com
+  migração pendente, em "Schema desatualizado".
+- Worker com `AI_ENABLED=false` loga `worker_disabled` e encerra com 0.
+- `SIGTERM` no worker produz `shutdown_started` → `worker_stopped` →
+  `shutdown_complete` e código 0.
+
+O build das imagens Docker roda no job `docker` do CI, então deixou de ser
+pendência.
 
