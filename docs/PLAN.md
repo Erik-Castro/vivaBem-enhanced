@@ -618,11 +618,12 @@ Worker (claim/lease)
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | 3–4 dias | CI verde; E2E; deploy one-command |
 | 10 | Frontend Svelte 5 + Vite/PWA: fundação, auth, painel, contas, transações/categorias, PWA e deploy | 5–7 dias (MVP) | `svelte-check` e build verdes; fluxo completo no navegador; um comando de deploy |
 | 11 | Worker independente: entry point próprio, lease com token, dead letter, replay e dedupe | 2–3 dias | API não consome outbox; entrega pelo menos uma vez com efeitos idempotentes; replay auditado |
+| 12 | Congelamento da API v1: contrato estável, idempotência de escritas, fila offline | 1–2 dias | Contrato v1 congelado; mudanças exigem `/api/v2` + MAJOR |
 
 **Total da API: ~31–43 dias.** Frontend completo: ~15–20 dias; o MVP da Fase 10
 cobre fundação, autenticação, painel e finanças.
 
-Fases 0 a 11 concluídas e publicadas de `0.1.0` a `0.12.0`. Todas as telas do
+Fases 0 a 12 concluídas e publicadas de `0.1.0` a `1.0.0`. Todas as telas do
 frontend estão entregues: fundação, autenticação, painel, contas, transações,
 categorias, orçamentos, metas, hábitos, investimentos, conquistas, notificações,
 insights, importação/exportação, família, PWA e deploy. A IA roda em processo
@@ -814,11 +815,11 @@ make web-build           # build de produção em web/dist
 
 ## 16. Próximo passo
 
-A **Fase 11** (worker independente) está concluída em `0.12.0`: a API não
-consome mais o outbox, o worker tem lease com token, dead letter e replay
-auditado. O próximo ciclo é operacional — monitorar dead letter, backups e
-prontidão — e qualquer nova funcionalidade exige escopo aprovado. A API está
-congelada em `/api/v1`; mudanças de contrato exigem `/api/v2` + release MAJOR.
+A **Fase 12** (congelamento da API v1 → `1.0.0`) está concluída: o contrato da
+API v1 está estável em `/api/v1`; mudanças retrocompatíveis são aceitas, e
+remoções ou renomeações exigem `/api/v2` + release MAJOR. O próximo ciclo é
+operacional — monitorar dead letter, backups e prontidão — e qualquer nova
+funcionalidade exige escopo aprovado.
 
 ---
 

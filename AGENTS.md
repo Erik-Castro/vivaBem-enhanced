@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas, versão `0.12.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão `1.0.0`
 
 ---
 
@@ -47,7 +47,7 @@ consome a API em `/api/v1` pela mesma origem; o MVP está entregue.
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`), 8 (`0.9.0`), 9 (`0.10.0`), 10 (`0.11.0`) e 11 (`0.12.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`), 8 (`0.9.0`), 9 (`0.10.0`), 10 (`0.11.0`), 11 (`0.12.0`) e 12 (`1.0.0`) estão concluídas. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -602,8 +602,8 @@ Regras:
 - Oitava release: `0.8.0` (2026-11-05), publicada ao concluir a Fase 7.
 - Nona release: `0.9.0` (2026-11-09), publicada ao concluir a Fase 8.
 - Décima release: `0.10.0` (2026-11-09), publicada ao concluir a Fase 9.
-- Décima primeira release: `0.11.0` (2026-11-11), publicada ao concluir a Fase 10.
 - Décima segunda release: `0.12.0` (2026-11-11), publicada ao concluir a Fase 11.
+- Décima terceira release: `1.0.0` (2026-11-11), publicada ao congelar a API v1.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -722,6 +722,7 @@ deno test --coverage
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ✅ `0.10.0` |
 | 10 | Frontend Svelte 5 + Vite/PWA | ✅ `0.11.0` (auth, painel, contas, transações, categorias, orçamentos, metas, hábitos, investimentos, conquistas, PWA, deploy) |
 | 11 | Worker independente: entry point próprio, lease, dead letter e replay | ✅ `0.12.0` |
+| 12 | Congelamento da API v1: contrato estável, idempotência de escritas, fila offline | ✅ `1.0.0` |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 

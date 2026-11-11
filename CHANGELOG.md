@@ -5,22 +5,30 @@ Todas as mudanças notáveis deste projeto são documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+## [1.0.0] - 2026-11-11
+
+Primeira release estável: API v1 congelada.
 
 ### Added
 
+- Contrato da API v1 congelado em `/api/v1`: mudanças retrocompatíveis aceitas;
+  remoções ou renomeações exigem `/api/v2` + release MAJOR.
 - `deno task outbox:replay --stats`: panorama da fila com totais por status,
   idade do evento pendente mais antigo, pendentes em retry (`attempts > 0`) e
   dead letter agrupado por tipo de evento.
 - `worker_stats` agora inclui `retrying` e `deadLetterByType`, para diferenciar
   falha de provider de payload inválido sem abrir o banco.
-
-### Changed
-
 - `GET /ready` valida se o schema aplicado corresponde às migrações do código e
   responde 503 (`status: not_ready`, `checks.schema: outdated`) quando o banco
   está atrás — antes só checava se a conexão respondia. A resposta ganhou
   `checks.schema` (`ok`, `outdated` ou `unknown`).
+- Idempotência de escritas via cabeçalho `Idempotency-Key` opcional em
+  POST/PUT/PATCH/DELETE: reenvios com a mesma chave devolvem o resultado em
+  cache em vez de reexecutar a operação.
+- Fila offline no cliente: mutações são enfileiradas em IndexedDB quando
+  sem conexão e replayadas automaticamente ao retornar.
+
+## [Unreleased]
 
 ## [0.12.0] - 2026-11-11
 
