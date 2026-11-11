@@ -47,7 +47,7 @@ consome a API em `/api/v1` pela mesma origem; o MVP está entregue.
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`), 8 (`0.9.0`), 9 (`0.10.0`) e 10 (`0.11.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`), 8 (`0.9.0`), 9 (`0.10.0`) e 10 (`0.11.0`) estão concluídas. A extração do worker para processo independente (Fase 11) está implementada em `[Unreleased]`. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -59,7 +59,8 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/shared/crypto/jwt.ts` | assinatura/verificação de access token HS256 |
 | `src/shared/crypto/tokens.ts` | token opaco, SHA-256, base64url, comparação constante |
 | `src/shared/utils/rate-limiter.ts` | janela deslizante em memória |
-| `src/events/` | outbox transacional, publisher e worker com lease/backoff/dead-letter |
+| `src/events/` | outbox transacional, publisher, registry de eventos e CLI de replay |
+| `src/worker/` | entry point e runtime do worker: polling, lease/heartbeat, concorrência e shutdown gracioso |
 | `src/ai/` | providers, parser, redação, prompts, contexto, correlação, embeddings, executor, tools |
 | `src/modules/auth/` | repository, service e controller de identidade |
 | `src/modules/users/` | `/me`, preferências (incl. `aiEnabled`) e sessões |
@@ -89,9 +90,11 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/db/migrations/006_engagement.sql` | conquistas, progresso e notificações |
 | `src/db/migrations/007_ai.sql` | outbox, logs de IA, insights, feedback, embeddings e blocklist |
 | `src/db/migrations/008_data.sql` | vínculos familiares e unicidade de `import_hash` |
+| `src/db/migrations/009_hardening.sql` | índices de manutenção (sessões e outbox) |
+| `src/db/migrations/010_worker.sql` | lease da outbox, `dead_letter`, replay e `dedupe_key` |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
-| `src/main.ts` | bootstrap: config → migrações → seed → catch-up → runtime de IA → servidor |
-| `tests/` | unitários e integração com SQLite real (216 testes) |
+| `src/main.ts` | bootstrap da API: config → migrações → seed → catch-up → servidor (sem worker) |
+| `tests/` | unitários e integração com SQLite real (241 testes) |
 | `bin/sqlite-vector/` | binários de fallback (Linux x86_64/arm64) |
 | `web/` | SPA Svelte 5 + Vite + PWA: shell, páginas, componentes, `lib/` e assets PWA |
 | `web/src/lib/api.ts` | cliente HTTP com cookies, CSRF, refresh single-flight e tradução de erros |
@@ -117,6 +120,8 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 ```bash
 deno task dev            # servidor com watch (carrega .env.example)
 deno task start          # servidor
+deno task dev:worker     # worker com watch (carrega .env.example)
+deno task worker         # worker do EIE (consome o outbox)
 deno task test           # suíte completa (tests/)
 deno task test:coverage  # testes com cobertura
 deno task check          # typecheck de src, tests e scripts
@@ -126,6 +131,8 @@ deno task fmt:check      # verifica formatação
 deno task db:migrate     # aplica migrações pendentes
 deno task db:reset       # apaga e recria o banco
 deno task db:backup      # backup em backups/
+deno task outbox:replay --list   # eventos em dead letter
+deno task outbox:replay --id=<uuid> --force  # recoloca na fila
 deno task check:release  # valida versão x CHANGELOG
 
 make web-install         # npm ci em web/
@@ -172,7 +179,11 @@ const app = createApp({ db, config, logger, ai });
 
 ```text
 src/
-  main.ts              # bootstrap: config → migrations → worker → server
+  main.ts              # bootstrap da API: config → migrations → seed → server
+  worker/
+    main.ts            # entry point do worker (sem HTTP)
+    runtime.ts         # polling, lease/heartbeat, pool e shutdown
+    backoff.ts errors.ts
   app.ts               # factory do Hono (testável)
   config.ts            # env validado com Zod
   version.ts           # versão do deno.json
@@ -182,7 +193,7 @@ src/
                        # recurring, budgets, goals, habits, investments,
                        # achievements, notifications, family, insights,
                        # import, export
-  events/              # publisher (outbox) + worker
+  events/              # publisher (outbox) + registry + replay CLI
   ai/                  # providers, context, prompts, tools, registry,
                        # executor, embeddings, correlation
   shared/              # crypto, logger, utils
@@ -312,12 +323,24 @@ src/modules/<dominio>/
   eventos quando `AI_ENABLED=true` **e** `user_preferences.ai_enabled=1`;
   `EventPublisher.publish` devolve `null` quando a IA está desligada ou o
   usuário não autorizou, então pode ser chamado sem condicional nos services.
-- O claim usa um único `UPDATE ... RETURNING`, incrementando `attempts`; o
-  worker recupera leases vencidos antes de cada ciclo, aplica backoff de 5s até
-  5min e envia para dead-letter quando `AI_MAX_RETRIES + 1` tentativas falham.
+- A API não consome o outbox. O consumidor é o processo independente
+  `src/worker/main.ts` (Fase 11), que abre a própria conexão SQLite e fala com
+  a API apenas pelo arquivo do banco (WAL + `busy_timeout`).
+- O claim usa um único `UPDATE ... RETURNING`, incrementando `attempts` e
+  gravando `lease_token`/`lease_expires_at`; `complete`/`fail` só afetam a
+  concessão corrente (`worker_id` + token). Leases vencidos são recuperados
+  antes de cada ciclo; heartbeat renova o lease durante o processamento.
+- Backoff de 5s até 5min; falha permanente (payload inválido, tipo
+  desconhecido, 4xx do provider) vai direto para `dead_letter`; falha
+  transitória esgota `WORKER_MAX_ATTEMPTS` antes de ir para `dead_letter`.
+- `src/events/event-registry.ts` descreve pipeline e validação de payload por
+  tipo; o processor consulta o registry antes de montar contexto.
 - O processor indexa embeddings quando o tipo é `embedding.requested`; nos
   demais eventos monta contexto via SQL, redige PII, chama o provider, valida a
   resposta com Zod e delega as tool calls ao executor.
+- Insights e notificações deduplicam por `dedupe_key = "<eventId>:<título>"`
+  com índice único parcial; reprocessar o mesmo evento não duplica efeitos.
+  A entrega continua sendo pelo menos uma vez, nunca exactly-once.
 - O executor valida schema, confiança mínima, risco alto (≥ 0.9), cooldown,
   duplicidade de argumentos em 24h e audita tudo em `ai_action_logs`. Nenhuma
   tool executa SQL arbitrário.
@@ -326,6 +349,9 @@ src/modules/<dominio>/
 - A correlação cross-domain (`habit_spending_link`, `weekend_spending_peak`) é
   calculada em SQL e só agenda `correlation.check` após
   `AI_CORRELATION_THRESHOLD` eventos concluídos desde a última execução.
+- O worker não migra: `assertSchemaCurrent` falha no boot se a API ainda não
+  aplicou o schema. `deno task outbox:replay` é o caminho auditável para
+  devolver eventos de `dead_letter` à fila.
 
 ### 5.9 Dados e colaboração (Fase 8)
 
@@ -524,7 +550,8 @@ Worker (claim/lease)
 Regras:
 
 - **Nunca** publique evento fora do outbox. O evento nasce na mesma transação da regra.
-- Worker com claim atômico, lease, backoff, recuperação de travados e dead-letter.
+- O consumidor é o worker independente (`src/worker/main.ts`); a API não processa eventos.
+- Worker com claim atômico, lease com token, backoff, recuperação de travados e `dead_letter`.
 - Provider OpenAI-compatible via `fetch`; adapter Ollama opcional via `AI_PROVIDER`.
 - Parser robusto: remove ` thinking`/prosa, extrai JSON e valida com Zod; falha de
   parse vira retry no worker, não no parser.
@@ -693,6 +720,7 @@ deno test --coverage
 | 8 | Dados e colaboração: import CSV/OFX, export, family links | ✅ `0.9.0` |
 | 9 | Hardening: segurança, E2E, cobertura, índices, backups, docs, deploy | ✅ `0.10.0` |
 | 10 | Frontend Svelte 5 + Vite/PWA | ✅ `0.11.0` (auth, painel, contas, transações, categorias, orçamentos, metas, hábitos, investimentos, conquistas, PWA, deploy) |
+| 11 | Worker independente: entry point próprio, lease, dead letter e replay | ✅ `[Unreleased]` |
 
 Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 
@@ -770,8 +798,15 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/modules/family/` | Convites, vínculo familiar e resumo agregado do parceiro |
 | `src/modules/security/` | Bloqueio de IP acionado pelas tools |
 | `src/events/event-publisher.ts` | Publicação no outbox (opt-in e IA ligada) |
-| `src/events/worker.ts` | Claim, lease, backoff, dead-letter e correlação |
+| `src/events/event-registry.ts` | Catálogo de tipos, pipeline e validação de payload |
+| `src/events/outbox.repository.ts` | Claim com lease, rename, replay e estatísticas |
+| `src/events/replay-cli.ts` | CLI `deno task outbox:replay` |
+| `src/worker/main.ts` | Entry point do worker independente |
+| `src/worker/runtime.ts` | Polling, lease/heartbeat, concorrência e shutdown |
+| `src/worker/backoff.ts` | Backoff exponencial com jitter |
+| `src/worker/errors.ts` | Classificação de falhas transitórias x permanentes |
 | `src/ai/ai.processor.ts` | Orquestração de contexto, provider, parser e executor |
+| `src/ai/ai.runtime.ts` | Factories de embeddings e do pipeline de IA |
 | `src/ai/ai.executor.ts` | Validação, confiança, cooldown, dedupe e auditoria |
 | `src/ai/ai.redaction.ts` | Redação de PII antes do provider |
 | `src/ai/embeddings.service.ts` | Indexação assíncrona e busca vetorial |

@@ -350,3 +350,28 @@ backup por cópia de arquivo é inconsistente com WAL ativo.
 **Consequência:** o host precisa de Docker Compose v2; o SQLite continua
 single-writer, então o deploy assume uma instância. Restore exige parar a stack
 e remover `-wal`/`-shm`.
+
+## ADR-035 — Worker do EIE como processo independente
+
+**Decisão:** o consumidor do outbox sai da API e vira o entry point
+`src/worker/main.ts` (`deno task worker`). API e worker são processos separados
+que compartilham apenas o arquivo SQLite; a API continua dona do schema e o
+worker falha no boot (`assertSchemaCurrent`) se houver migração pendente ou
+checksum divergente. A outbox ganha lease explícito com token, estado terminal
+`dead_letter` e replay manual auditado (`deno task outbox:replay`). As
+configurações novas `WORKER_*` têm fallback para `AI_*`.
+
+**Motivo:** um provider lento ou um loop de retry não deve bloquear requisições
+HTTP nem exigir restart da API. O lease com token protege contra duas
+instâncias confirmando o mesmo evento, e o replay auditado substitui a
+intervenção manual direto no banco. Manter `src/main.ts` como entry point da
+API (em vez de mover para `src/api/main.ts`) evita reestruturar um repositório
+grande só para acomodar a separação.
+
+**Consequência:** o deploy precisa de um segundo processo (`profiles: ["ai"]`
+no Compose) apontando para o mesmo volume. A entrega continua sendo pelo menos
+uma vez: handlers precisam ser idempotentes (daí o `dedupe_key` em insights e
+notificações). O worker não abandona o status `failed` legado de imediato —
+`010_worker.sql` mantém o valor no CHECK para permitir rollback de imagem — mas
+nenhum código novo o produz. SQLite continua single-writer: o worker não é uma
+forma de escalar escrita horizontalmente, apenas de isolar o consumo da IA.

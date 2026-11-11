@@ -25,6 +25,47 @@ const app = createApp({ db, config, logger });
 - Testes criam um SQLite temporário por teste (`tests/helpers/db.ts`).
 - `createApp` não abre banco, não roda migração e não escuta porta.
 
+## Processos
+
+A aplicação tem dois entry points independentes que compartilham apenas o
+arquivo SQLite:
+
+```text
+src/main.ts          API HTTP (Hono) — dona do schema
+src/worker/main.ts   worker do outbox — sem porta HTTP
+```
+
+- A API roda migrações, seed, catch-up de recorrências, manutenção e o servidor.
+  Ela publica eventos no outbox, mas não os consome.
+- O worker abre a própria conexão (`WAL` + `busy_timeout`) e consome apenas
+  `event_outbox`. Ele não migra: `assertSchemaCurrent` falha no boot se a API
+  ainda não aplicou o schema, evitando processar eventos com colunas ausentes.
+- Com `AI_ENABLED=false` o worker registra `worker_disabled` e encerra com
+  código 0; a API continua funcionando sem ele.
+- Nem toda chamada de IA está fora da transação de escrita: o worker processa
+  eventos **depois** do commit da regra de negócio, nunca dentro dela.
+
+### Ciclo de vida do worker
+
+1. `recoverExpired` devolve eventos cujo lease venceu para `pending` (ou
+   `dead_letter` quando as tentativas acabaram) antes de cada ciclo.
+2. `claimNext` faz um único `UPDATE ... RETURNING`, grava `lease_token`,
+   `lease_expires_at` e incrementa `attempts`.
+3. O processamento renova o lease por heartbeat. Se o processo perder a posse
+   (token diferente), `complete`/`fail` retornam sem efeito e o evento será
+   recuperado pelo próximo worker.
+4. Falha transitória volta para `pending` com backoff exponencial (5s até
+   5min) e jitter; falha permanente ou tentativas esgotadas vão para
+   `dead_letter`.
+5. `SIGINT`/`SIGTERM` param o loop e aguardam até `WORKER_SHUTDOWN_GRACE_MS`;
+   o que não terminar a tempo é abandonado e recuperado por lease.
+6. `deno task outbox:replay` lista e reenfileira eventos terminais de forma
+   auditável (`replay_count`/`replayed_at`).
+
+A entrega é **pelo menos uma vez**. Nenhum handler assume execução única:
+insights e notificações deduplicam por `dedupe_key`, e a outbox garante que o
+evento só nasce depois do commit da regra de negócio.
+
 ## Banco
 
 - SQLite com `better-sqlite3` (síncrono) e `sqlite-vector`.
@@ -80,10 +121,27 @@ habilitado e a tabela `embedding_items` existe (Fase 7).
 - CSRF double-submit + validação de Origin.
 - Rate limit por IP, por e-mail e limites próprios para importação/exportação.
 
-## Eventos e IA (Fase 7)
+## Eventos e IA (Fase 7 + Fase 11)
 
-O evento nasce no **outbox** dentro da mesma transação da regra de negócio. Um
-worker faz claim atômico com lease, aplica backoff e move para dead-letter após
-`AI_MAX_RETRIES`. O LLM não consulta o banco: métricas são calculadas em SQL e
-enviadas como contexto; o modelo só sugere tool calls, que passam pelo executor
-com validação, autorização e auditoria.
+O evento nasce no **outbox** dentro da mesma transação da regra de negócio. O
+consumidor é o **worker independente** (`src/worker/`), que faz claim atômico
+com lease, aplica backoff com jitter e move para dead letter após
+`WORKER_MAX_ATTEMPTS` (falhas permanentes vão direto). O LLM não consulta o
+banco: métricas são calculadas em SQL e enviadas como contexto; o modelo só
+sugere tool calls, que passam pelo executor com validação, autorização e
+auditoria.
+
+```text
+API (transação) → event_outbox ──→ worker (claim/lease)
+                                      ├─ registry (tipo + payload)
+                                      ├─ context builder (SQL)
+                                      ├─ provider + parser (Zod)
+                                      ├─ executor (tools + audit)
+                                      └─ insights / notifications (dedupe)
+```
+
+Separar os processos permite escalar/reiniciar o consumidor sem derrubar a API
+e impede que um provider lento bloqueie requisições HTTP. O custo é um segundo
+processo no deploy e a exigência de que ambos usem o mesmo arquivo SQLite —
+`SQLite` continua single-writer e o worker não substitui a API como dona do
+schema.

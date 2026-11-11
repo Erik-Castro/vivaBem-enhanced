@@ -32,6 +32,30 @@ O frontend fica em `http://localhost:${WEB_PORT:-8080}` e encaminha `/api`,
 Para parar sem perder dados: `make down` (os volumes `vivabem-data` e
 `vivabem-backups` permanecem).
 
+### Worker de IA (perfil `ai`)
+
+O consumidor do outbox é um serviço separado, com a mesma imagem e o mesmo
+volume SQLite. Ele só sobe quando o perfil `ai` é ativado; a API funciona sem
+ele.
+
+```bash
+# Sobe API + frontend + worker
+docker compose --profile ai up -d --build
+
+# Só o worker (API já em execução)
+docker compose --profile ai up -d worker
+
+docker compose logs -f worker
+```
+
+- Sem `AI_ENABLED=true` o worker registra `worker_disabled` e encerra com
+  código 0; por isso o perfil existe: não faz sentido manter um processo ocioso.
+- O worker **não migra**. Se a API ainda não aplicou o schema, ele sai com
+  erro `Schema desatualizado` e o `restart` tenta de novo até o banco estar ok.
+- `stop_grace_period: 35s` é maior que `WORKER_SHUTDOWN_GRACE_MS` (30s) para o
+  encerramento gracioso terminar antes do `SIGKILL`.
+- A entrega é pelo menos uma vez; handlers deduplicam por `dedupe_key`.
+
 ### O que o Compose garante
 
 - API e frontend não-root (`appuser` uid 10001 / `nginx` uid 101), com imagens
@@ -92,6 +116,13 @@ do frontend precisa ser igual a `APP_ORIGIN` da API.
 | `RATE_LIMIT_AUTH_MAX` | não | Padrão 5/min por IP e por e-mail |
 | `RATE_LIMIT_DATA_MAX` | não | Padrão 30/min para import/export |
 | `AI_ENABLED` | não | Defina `false` em produção; o `.env.example` liga com Ollama local |
+| `WORKER_ID` | não | Identificador do worker; padrão `worker-<uuid>` |
+| `WORKER_CONCURRENCY` | não | Eventos processados em paralelo (1 a 8; padrão 1) |
+| `WORKER_LEASE_MS` | não | Validade do lease; padrão 60000 |
+| `WORKER_HEARTBEAT_MS` | não | Renovação do lease; deve ser menor que o lease |
+| `WORKER_MAX_ATTEMPTS` | não | Tentativas antes do dead letter (padrão 5) |
+| `WORKER_POLL_INTERVAL_MS` | não | Intervalo de polling (padrão 1000) |
+| `WORKER_SHUTDOWN_GRACE_MS` | não | Espera no shutdown gracioso (padrão 30000) |
 | `LOG_LEVEL` | não | `info` em produção |
 
 Lista completa: `.env.example`.
@@ -155,6 +186,27 @@ derrubam o processo. O índice `idx_user_sessions_expires` e o índice parcial
 `idx_event_outbox_cleanup` (migração `009_hardening.sql`) mantêm a limpeza
 barata.
 
+## Replay de eventos (dead letter)
+
+Eventos que esgotaram as tentativas ou falharam de forma permanente ficam em
+`dead_letter`. A inspeção e o reprocessamento são feitos pela CLI, nunca por
+`UPDATE` manual:
+
+```bash
+# Lista os eventos terminais (JSON no stdout)
+docker compose exec vivabem deno task outbox:replay --list
+
+# Devolve um evento à fila (auditado em replay_count/replayed_at)
+docker compose exec vivabem deno task outbox:replay --id=<uuid>
+
+# Força replay de um evento pending/processing (use com cautela)
+docker compose exec vivabem deno task outbox:replay --id=<uuid> --force
+```
+
+Replay não garante execução única: os handlers são idempotentes por
+`dedupe_key`, mas efeitos externos devem continuar sendo reprocessáveis. Se a
+falha for de configuração (provider, chave, modelo), corrija antes de reenviar.
+
 ## Checklist de produção
 
 - [ ] `ENV=production`, `COOKIE_SECURE=true` e HTTPS no proxy.
@@ -164,6 +216,9 @@ barata.
 - [ ] Backup diário agendado, cópia off-host e restore testado.
 - [ ] `/health` e `/ready` monitorados; logs JSON coletados.
 - [ ] `AI_ENABLED=false` até o usuário autorizar; chaves de IA só no ambiente.
+- [ ] Worker no perfil `ai` monitorado quando a IA estiver ligada; logs em
+      `worker_started`/`worker_stats`/`worker_stopped`.
+- [ ] Eventos em `dead_letter` revisados e reenviados com `outbox:replay`.
 - [ ] Rate limits revisados para o tráfego esperado.
 - [ ] Uma única instância (SQLite é single-writer).
 - [ ] Frontend servido por HTTPS e `APP_ORIGIN` igual à URL pública.

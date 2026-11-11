@@ -9,6 +9,37 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Added
 
+- Worker do Event Intelligence Engine extraído para processo independente:
+  `src/worker/main.ts` (`deno task worker`/`deno task dev:worker`) consome o
+  outbox sozinho e a API deixa de iniciar o consumidor. Os dois processos
+  compartilham apenas o arquivo SQLite (WAL + `busy_timeout`).
+- `src/worker/runtime.ts` com polling, pool de concorrência
+  (`WORKER_CONCURRENCY`), heartbeat de lease, recuperação de leases vencidos,
+  shutdown gracioso (`WORKER_SHUTDOWN_GRACE_MS`) e estatísticas
+  `worker_stats`.
+- `src/events/event-registry.ts`: catálogo fechado de tipos de evento com
+  pipeline e validação de payload por Zod. Tipo desconhecido ou payload
+  inválido vira falha permanente (dead letter), não retry infinito.
+- Variáveis `WORKER_*` em `src/config.ts` (`WORKER_ID`,
+  `WORKER_POLL_INTERVAL_MS`, `WORKER_LEASE_MS`, `WORKER_HEARTBEAT_MS`,
+  `WORKER_MAX_ATTEMPTS`, `WORKER_CONCURRENCY`, `WORKER_SHUTDOWN_GRACE_MS`),
+  com fallback para `AI_WORKER_INTERVAL`/`AI_MAX_RETRIES`/`AI_REQUEST_TIMEOUT`.
+  `loadWorkerConfig` rejeita heartbeat maior ou igual ao lease.
+- `deno task outbox:replay` (`--list`, `--id=`, `--force`, `--limit=`) para
+  inspecionar e reprocessar eventos em dead letter. O replay é auditado por
+  `replay_count`/`replayed_at` e mantém o identificador original.
+- `assertSchemaCurrent` em `src/db/migrate.ts`: o worker (e a CLI de replay)
+  não migram; falham no boot com mensagem acionável quando o schema está
+  atrasado, falta uma migração ou o checksum diverge.
+- Migração `010_worker.sql`: lease explícito (`lease_token`,
+  `lease_expires_at`), estado terminal `dead_letter`, contadores de replay e
+  `dedupe_key` em `ai_insights`/`notifications`.
+- Deduplicação de insights e notificações por
+  `dedupe_key = "<eventId>:<título>"` com índice único parcial. A entrega
+  continua sendo pelo menos uma vez; os efeitos é que são idempotentes.
+- Serviço `worker` no `compose.yaml` (mesma imagem, `command: deno task worker`,
+  `profiles: ["ai"]`, `stop_grace_period: 35s`) e verificação de
+  `src/worker/main.ts` no `Dockerfile`.
 - Tela de insights (`#/insights`) com filtros por categoria e leitura, busca
   semântica com fallback textual, marcação de leitura (uma/todas), feedback
   "útil"/"não útil", paginação e aviso quando a IA está desativada.
@@ -35,6 +66,13 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Changed
 
+- A API não consome mais o outbox: provider, processor, executor,
+  correlações e o antigo `EventWorker` foram para o processo do worker, e
+  `src/events/worker.ts` foi removido em favor de `src/worker/`.
+- `AI_WORKER_INTERVAL`, `AI_MAX_RETRIES` e `AI_REQUEST_TIMEOUT` passam a ser
+  fallback de `WORKER_*`; `.env.example` documenta o bloco novo e o Compose só
+  sobe o worker com `--profile ai`. Com `AI_ENABLED=false` o worker registra
+  `worker_disabled` e encerra com código 0 (sem restart loop).
 - `.env.example` liga a IA (`AI_ENABLED=true`) com Ollama local: `qwen3.5:2b`
   para chat e `nomic-embed-text` para embeddings (768 dimensões). Em produção
   defina `AI_ENABLED=false`; a IA continua opt-in por usuário.
