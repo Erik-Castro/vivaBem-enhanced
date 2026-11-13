@@ -157,6 +157,11 @@ categorias, orçamentos, metas, hábitos, investimentos, conquistas, notificaç�
 (import/export), família e configurações (perfil, preferências, sessões e tema). Detalhes:
 [`docs/FRONTEND.md`](docs/FRONTEND.md).
 
+O PWA também entrega notificações push (opt-in por dispositivo, VAPID) e uso offline: mutações
+feitas sem rede vão para uma fila em IndexedDB com `Idempotency-Key` e são reproduzidas pelo service
+worker via Background Sync; o Periodic Sync atualiza apenas o badge. O service worker nunca cacheia
+`/api/**` nem chama `/auth/refresh`.
+
 ## Autenticação
 
 O fluxo é baseado em cookies, sem tokens no corpo da resposta:
@@ -189,6 +194,7 @@ deno task db:backup      # backup em backups/
 deno task outbox:replay --stats             # resumo da fila (totais, retries, dead letter)
 deno task outbox:replay --list  # eventos em dead letter
 deno task outbox:replay --id=<uuid> --force  # recoloca na fila
+deno task push:keys      # gera o par VAPID para push
 deno task check:release  # valida versão x changelog
 
 make web-install         # npm ci no frontend
@@ -221,6 +227,10 @@ Todas as variáveis estão em [`.env.example`](.env.example). Destaques:
 | `WORKER_LEASE_MS`         | `60000`                  | Validade do lease do evento                                |
 | `WORKER_MAX_ATTEMPTS`     | `5`                      | Tentativas antes do dead letter                            |
 | `WORKER_POLL_INTERVAL_MS` | `1000`                   | Intervalo de polling da outbox                             |
+| `PUSH_ENABLED`            | `false`                  | Liga notificações push (exige o par VAPID)                 |
+| `PUSH_VAPID_PUBLIC_KEY`   | —                        | Chave pública VAPID (`deno task push:keys`)                |
+| `PUSH_VAPID_PRIVATE_KEY`  | —                        | Chave privada VAPID, só no ambiente                        |
+| `PUSH_VAPID_SUBJECT`      | —                        | `mailto:` ou `https://`, obrigatório com push ligado       |
 | `VECTOR_EXTENSION_PATH`   | —                        | Sobrescreve o binário do `sqlite-vector`                   |
 
 Nenhum segredo tem valor padrão em produção. Em dev, um segredo efêmero é gerado no boot (com aviso
@@ -239,9 +249,10 @@ provider com chave).
 
 O consumidor do outbox é um processo independente: `deno task worker` (ou `deno task dev:worker` com
 watch). A API responde normalmente mesmo com o provider lento; os dois processos compartilham apenas
-o arquivo SQLite. Sem `AI_ENABLED=true` o worker registra `worker_disabled` e encerra. Eventos que
-esgotam as tentativas ficam em dead letter; `deno task outbox:replay --stats` dá o panorama da fila
-(totais, retries e dead letter por tipo) e `--list` mostra os eventos um a um.
+o arquivo SQLite. O worker também entrega push de forma independente da IA: sobe com `AI_ENABLED` ou
+`PUSH_ENABLED` e só encerra com os dois desligados (`worker_disabled`). Eventos que esgotam as
+tentativas ficam em dead letter; `deno task outbox:replay --stats` dá o panorama da fila (totais,
+retries e dead letter por tipo) e `--list` mostra os eventos um a um.
 
 ## Docker
 
@@ -257,14 +268,18 @@ curl -fsS http://127.0.0.1:3000/ready
 - API: `http://localhost:3000` (health em `/health`)
 - Frontend: `http://localhost:8080` (Nginx não-root, proxy para a API)
 
-O worker de IA é um serviço separado, no profile `ai` do Compose:
+O worker é um serviço separado, nos profiles `ai` e `push` do Compose:
 
 ```bash
-docker compose --profile ai up -d --build   # API + frontend + worker
-docker compose --profile ai up -d worker    # apenas o worker
+docker compose --profile ai --profile push up -d --build   # API + frontend + worker
+docker compose --profile ai up -d worker    # worker só com IA
+docker compose --profile push up -d worker  # worker só com push
 ```
 
-Sem IA habilitada ele encerra com `worker_disabled`; a stack continua funcionando sem o worker.
+Sem IA e sem push habilitados ele encerra com `worker_disabled`; a stack continua funcionando sem o
+worker. Em Portainer, `profiles` não são ativados automaticamente — defina
+`COMPOSE_PROFILES=ai,push` ou remova o `profiles` do worker numa stack dedicada (veja
+[`docs/DEPLOY-PORTAINER.md`](docs/DEPLOY-PORTAINER.md)).
 
 Em produção troque `APP_ORIGIN` pela URL HTTPS pública do frontend e mantenha `COOKIE_SECURE=true`.
 
@@ -298,15 +313,16 @@ Backup, restore, Portainer e checklist de produção: [`docs/DEPLOY.md`](docs/DE
 - [ ] Backup diário agendado, copiado para fora do host e restore testado.
 - [ ] `/health` e `/ready` monitorados.
 - [ ] `AI_ENABLED=false` até o usuário autorizar.
+- [ ] Com push ligado, `PUSH_VAPID_*` só no ambiente (nunca no banco ou no Git).
 - [ ] Uma única instância (SQLite é single-writer).
-- [ ] Frontend em HTTPS na mesma origem da API (proxy `/api` do Nginx).
+- [ ] Frontend em HTTPS na mesma origem da API (proxy `/api` do Nginx). Push exige HTTPS.
 
 ## Estrutura
 
 ```text
 src/
   main.ts          # bootstrap da API: config → migrações → seed → servidor
-  worker/          # entry point e runtime do consumidor da outbox (IA)
+  worker/          # entry point e runtime do consumidor da outbox (IA + push)
   app.ts           # factory do Hono (sem efeitos colaterais)
   config.ts        # env validado com Zod
   version.ts       # versão lida do deno.json
@@ -334,6 +350,7 @@ web/               # SPA Svelte 5 + Vite + PWA (Nginx no Compose)
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend
-Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão atual `1.0.1`. Todas as telas do
+Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão atual `1.1.0`. Todas as telas do
 frontend foram entregues: autenticação, painel, contas, transações, categorias, orçamentos, metas,
-hábitos, investimentos e conquistas. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
+hábitos, investimentos e conquistas. A `1.1.0` adicionou notificações push (VAPID), fila offline com
+Background Sync e Periodic Sync. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
