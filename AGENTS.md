@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão `1.0.1`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão `1.1.0`
 
 ---
 
@@ -637,6 +637,8 @@ Regras:
 - Décima terceira release: `1.0.0` (2026-11-11), publicada ao congelar a API v1.
 - Décima quarta release: `1.0.1` (2026-11-13), correção da idempotência nas rotas
   de autenticação e do repasse de `AI_*` no Compose/Portainer.
+- Décima quinta release: `1.1.0` (2026-11-13), notificações push, fila offline,
+  Background Sync e Periodic Sync.
 
 ### 11.3 Conventional Commits (recomendado)
 

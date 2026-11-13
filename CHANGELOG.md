@@ -7,6 +7,11 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-13
+
+Release de funcionalidade: notificações push, fila offline e sincronização em
+segundo plano. A API v1 continua estável; `1.0.1` permanece imutável.
+
 ### Added
 
 - Notificações push (Web Push + VAPID) de ponta a ponta: `PUSH_ENABLED` e as
