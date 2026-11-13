@@ -245,43 +245,41 @@ export function createApp({
     "/api/v1/export/*",
     rateLimit(rateLimiter, config, { scope: "export", max: config.rateLimit.dataMax }),
   );
-  app.use("/api/v1/me", requireAuth(repository, config));
-  app.use("/api/v1/me/*", requireAuth(repository, config));
-  app.use("/api/v1/accounts", requireAuth(repository, config));
-  app.use("/api/v1/accounts/*", requireAuth(repository, config));
-  app.use("/api/v1/categories", requireAuth(repository, config));
-  app.use("/api/v1/categories/*", requireAuth(repository, config));
-  app.use("/api/v1/transactions", requireAuth(repository, config));
-  app.use("/api/v1/transactions/*", requireAuth(repository, config));
-  app.use("/api/v1/recurring", requireAuth(repository, config));
-  app.use("/api/v1/recurring/*", requireAuth(repository, config));
-  app.use("/api/v1/budgets", requireAuth(repository, config));
-  app.use("/api/v1/budgets/*", requireAuth(repository, config));
-  app.use("/api/v1/goals", requireAuth(repository, config));
-  app.use("/api/v1/goals/*", requireAuth(repository, config));
-  app.use("/api/v1/habits", requireAuth(repository, config));
-  app.use("/api/v1/habits/*", requireAuth(repository, config));
-  app.use("/api/v1/habit-triggers", requireAuth(repository, config));
-  app.use("/api/v1/habit-triggers/*", requireAuth(repository, config));
-  app.use("/api/v1/investments", requireAuth(repository, config));
-  app.use("/api/v1/investments/*", requireAuth(repository, config));
-  app.use("/api/v1/achievements", requireAuth(repository, config));
-  app.use("/api/v1/achievements/*", requireAuth(repository, config));
-  app.use("/api/v1/notifications", requireAuth(repository, config));
-  app.use("/api/v1/notifications/*", requireAuth(repository, config));
-  app.use("/api/v1/insights", requireAuth(repository, config));
-  app.use("/api/v1/insights/*", requireAuth(repository, config));
-  app.use("/api/v1/import", requireAuth(repository, config));
-  app.use("/api/v1/import/*", requireAuth(repository, config));
-  app.use("/api/v1/export", requireAuth(repository, config));
-  app.use("/api/v1/export/*", requireAuth(repository, config));
-  app.use("/api/v1/family", requireAuth(repository, config));
-  app.use("/api/v1/family/*", requireAuth(repository, config));
+  // Grupos que exigem sessão. O padrão `*` do Hono também casa com o caminho
+  // base (ex.: `/api/v1/accounts/*` cobre `/api/v1/accounts` e subrotas), então
+  // cada grupo é registrado uma única vez. A lista é compartilhada para
+  // garantir que a idempotência rode depois de `requireAuth`: ela escopa a
+  // chave por `userId` e não pode atender rotas públicas (auth), onde a
+  // identidade ainda não existe.
+  const protectedPaths = [
+    "/api/v1/me/*",
+    "/api/v1/accounts/*",
+    "/api/v1/categories/*",
+    "/api/v1/transactions/*",
+    "/api/v1/recurring/*",
+    "/api/v1/budgets/*",
+    "/api/v1/goals/*",
+    "/api/v1/habits/*",
+    "/api/v1/habit-triggers/*",
+    "/api/v1/investments/*",
+    "/api/v1/achievements/*",
+    "/api/v1/notifications/*",
+    "/api/v1/insights/*",
+    "/api/v1/import/*",
+    "/api/v1/export/*",
+    "/api/v1/family/*",
+  ];
 
-  // Idempotência de escritas: requer userId (já definido pelo requireAuth).
-  // Aplica-se a rotas autenticadas; o middleware ignora requisições sem o
-  // cabeçalho Idempotency-Key, então é seguro para todas as rotas autenticadas.
-  app.use("/api/v1/*", idempotency(db));
+  for (const path of protectedPaths) {
+    app.use(path, requireAuth(repository, config));
+  }
+
+  // Idempotência de escritas: registrada depois dos guards para que `userId`
+  // já exista no contexto. O middleware ignora requisições sem o cabeçalho
+  // `Idempotency-Key`, então é seguro em todas as rotas autenticadas.
+  for (const path of protectedPaths) {
+    app.use(path, idempotency(db));
+  }
 
   // Registrado depois dos guards: quando `next()` retorna, `userId` já existe.
   app.use("*", evaluateAchievementsAfterMutation(achievementsService, logger));

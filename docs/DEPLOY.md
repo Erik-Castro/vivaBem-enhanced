@@ -56,6 +56,23 @@ docker compose logs -f worker
   encerramento gracioso terminar antes do `SIGKILL`.
 - A entrega é pelo menos uma vez; handlers deduplicam por `dedupe_key`.
 
+### Ollama acessível pelo container
+
+O Compose publica `host.docker.internal` (via `host-gateway`), mas o Ollama do
+host precisa aceitar conexões nesse endereço. Por padrão ele escuta apenas em
+`127.0.0.1`, e o container recebe `Connection refused`:
+
+```bash
+sudo systemctl edit ollama
+# [Service]
+# Environment="OLLAMA_HOST=0.0.0.0:11434"
+sudo systemctl restart ollama
+```
+
+Alternativa apenas em hosts Linux que não devem expor o Ollama na rede: rodar o
+worker com `network_mode: host` e `AI_OLLAMA_URL=http://127.0.0.1:11434`. Com
+`AI_PROVIDER=openai` isso não se aplica: use `AI_API_BASE_URL` e `AI_API_KEY`.
+
 ### O que o Compose garante
 
 - API e frontend não-root (`appuser` uid 10001 / `nginx` uid 101), com imagens

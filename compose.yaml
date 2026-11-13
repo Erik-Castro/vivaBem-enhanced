@@ -17,8 +17,25 @@ services:
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env ou no ambiente}
       # Em HTTP local (ex.: http://localhost:8080) use COOKIE_SECURE=false.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
-      AI_ENABLED: ${AI_ENABLED:-false}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # A API também valida e usa a configuração de IA (executor e embeddings);
+      # sem repassar estas variáveis ela cai no provider padrão e não sobe.
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-ollama}
+      AI_OLLAMA_URL: ${AI_OLLAMA_URL:-http://host.docker.internal:11434}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_REQUEST_TIMEOUT: ${AI_REQUEST_TIMEOUT:-60000}
+      AI_API_BASE_URL: ${AI_API_BASE_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_API_MODEL_CHAT_NAME: ${AI_API_MODEL_CHAT_NAME:-}
+      AI_API_MODEL_EMBEDDINGS_NAME: ${AI_API_MODEL_EMBEDDINGS_NAME:-nomic-embed-text}
+      AI_EMBEDDING_DIMENSIONS: ${AI_EMBEDDING_DIMENSIONS:-768}
+      AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-0.7}
+      AI_MAX_EVENTS_PER_BATCH: ${AI_MAX_EVENTS_PER_BATCH:-10}
+      AI_CORRELATION_THRESHOLD: ${AI_CORRELATION_THRESHOLD:-50}
+    # No Linux, Ollama no host só é alcançável por este alias.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # O SQLite e os backups vivem fora do container.
       - vivabem-data:/app/data
@@ -64,8 +81,8 @@ services:
       AI_API_BASE_URL: ${AI_API_BASE_URL:-}
       AI_API_KEY: ${AI_API_KEY:-}
       AI_API_MODEL_CHAT_NAME: ${AI_API_MODEL_CHAT_NAME:-}
-      AI_API_MODEL_EMBEDDINGS_NAME: ${AI_API_MODEL_EMBEDDINGS_NAME:?defina AI_API_MODEL_EMBEDDINGS_NAME}
-      AI_EMBEDDING_DIMENSIONS: ${AI_EMBEDDING_DIMENSIONS:?defina AI_EMBEDDING_DIMENSIONS}
+      AI_API_MODEL_EMBEDDINGS_NAME: ${AI_API_MODEL_EMBEDDINGS_NAME:-nomic-embed-text}
+      AI_EMBEDDING_DIMENSIONS: ${AI_EMBEDDING_DIMENSIONS:-768}
       AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-0.7}
       AI_MAX_EVENTS_PER_BATCH: ${AI_MAX_EVENTS_PER_BATCH:-10}
       AI_CORRELATION_THRESHOLD: ${AI_CORRELATION_THRESHOLD:-50}
@@ -76,6 +93,8 @@ services:
       WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-5}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
       WORKER_SHUTDOWN_GRACE_MS: ${WORKER_SHUTDOWN_GRACE_MS:-30000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Exatamente o mesmo arquivo SQLite da API (WAL + busy_timeout).
       - vivabem-data:/app/data
