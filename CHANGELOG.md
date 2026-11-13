@@ -7,6 +7,8 @@ adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-13
+
 ### Security
 
 - **A-01 (P0)**: Spoofing de `X-Forwarded-For` no rate limit / blocklist corrigido. O IP do cliente
