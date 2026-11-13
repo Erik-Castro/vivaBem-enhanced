@@ -1,8 +1,12 @@
 /// <reference lib="webworker" />
-import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
+import {
+  cleanupOutdatedCaches,
+  createHandlerBoundToURL,
+  precacheAndRoute,
+} from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { notificationTarget } from "./lib/notification-links";
-import { listPending, removeFromQueue } from "./lib/offline-queue";
+import { getQueueOwner, listPending, removeFromQueue } from "./lib/offline-queue";
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -155,7 +159,12 @@ async function flushOfflineQueue(): Promise<void> {
     return;
   }
 
-  const pending = await listPending();
+  // Sem dono persistido não há sessão confirmada pela página: não reproduz
+  // nada. Isso impede que a fila de uma conta seja enviada com outra sessão.
+  const owner = await getQueueOwner();
+  if (owner === null) return;
+
+  const pending = await listPending(owner);
 
   for (const entry of pending) {
     if (entry.csrf === undefined) return;

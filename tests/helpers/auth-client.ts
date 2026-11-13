@@ -2,6 +2,14 @@ import type { createApp } from "../../src/app.ts";
 
 type TestApp = ReturnType<typeof createApp>;
 
+/**
+ * Env de conexão para `app.request`: simula o Nginx como peer confiável, para
+ * que os testes possam variar `X-Forwarded-For` como o proxy faria.
+ */
+export const TEST_CONN_ENV = {
+  remoteAddr: { hostname: "127.0.0.1", port: 1234 },
+} as const;
+
 /** Lê todos os `Set-Cookie` e devolve nome → valor (vazio quando removido). */
 export function parseSetCookies(headers: Headers): Map<string, string> {
   const cookies = new Map<string, string>();
@@ -40,7 +48,7 @@ export class AuthTestClient {
   }
 
   async bootstrapCsrf(): Promise<void> {
-    const response = await this.#app.request("/api/v1/auth/csrf");
+    const response = await this.#app.request("/api/v1/auth/csrf", {}, TEST_CONN_ENV);
     this.#absorb(response);
   }
 
@@ -55,7 +63,7 @@ export class AuthTestClient {
     if (cookie !== "") headers.cookie = cookie;
     headers["x-csrf-token"] = this.csrfToken;
 
-    const response = await this.#app.request(path, { method, headers, body: form });
+    const response = await this.#app.request(path, { method, headers, body: form }, TEST_CONN_ENV);
     this.#absorb(response);
     return response;
   }
@@ -84,11 +92,15 @@ export class AuthTestClient {
       headers["x-csrf-token"] = this.csrfToken;
     }
 
-    const response = await this.#app.request(path, {
-      method,
-      headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    });
+    const response = await this.#app.request(
+      path,
+      {
+        method,
+        headers,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      },
+      TEST_CONN_ENV,
+    );
 
     this.#absorb(response);
     return response;

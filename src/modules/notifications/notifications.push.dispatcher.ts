@@ -1,5 +1,6 @@
 import type { PushConfig } from "../../config.ts";
 import type { Logger } from "../../shared/logger/index.ts";
+import { isAllowedPushEndpoint } from "./notifications.push.endpoint.ts";
 import type { NotificationsPushRepository } from "./notifications.push.repository.ts";
 import type { PushSender } from "./notifications.push.sender.ts";
 import type {
@@ -136,6 +137,17 @@ export class PushDispatcher {
     let revoked = 0;
 
     for (const subscription of subscriptions) {
+      // Defesa em profundidade: uma linha gravada antes da allowlist (ou por
+      // migração manual) não pode transformar o worker em SSRF.
+      if (!isAllowedPushEndpoint(subscription.endpoint, this.#config.endpointHosts)) {
+        if (this.#repository.revokeById(subscription.id, now)) revoked++;
+        this.#logger.warn("push_endpoint_blocked", {
+          workerId: this.#workerId,
+          subscriptionId: subscription.id,
+        });
+        continue;
+      }
+
       try {
         await this.#sender.send(
           {

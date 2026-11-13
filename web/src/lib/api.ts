@@ -4,6 +4,7 @@ import {
   listPending,
   pendingCount,
   removeFromQueue,
+  setQueueOwner,
   updateCsrfSnapshot,
 } from "./offline-queue";
 
@@ -80,17 +81,33 @@ let csrfPromise: Promise<string> | null = null;
 let refreshPromise: Promise<boolean> | null = null;
 let isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
 let replaying = false;
+/**
+ * Dono da sessão atual. Mutações offline e replay são escopados por ele: uma
+ * fila de outra conta nunca é reproduzida com a sessão ativa.
+ */
+let activeUserId: string | null = null;
 
 /** Liga o cliente HTTP ao store de autenticação sem criar dependência circular. */
 export function setAuthHooks(hooks: AuthHooks): void {
   authHooks = hooks;
 }
 
+/**
+ * Define o dono da sessão ativa e persiste o valor para o service worker.
+ *
+ * `null` (logout/sessão expirada) também apaga o dono persistido, então o
+ * worker não reproduz mutações antigas com uma sessão nova.
+ */
+export function setActiveUser(userId: string | null): void {
+  activeUserId = userId;
+  void setQueueOwner(userId).catch(() => undefined);
+}
+
 export function setCsrfToken(token: string): void {
   csrfMemory = token;
   // Mantém o snapshot da fila offline alinhado com o token atual, para o
   // service worker conseguir reproduzir mutações sem aba aberta.
-  void updateCsrfSnapshot(token).catch(() => undefined);
+  void updateCsrfSnapshot(token, activeUserId ?? undefined).catch(() => undefined);
 }
 
 export function isOffline(): boolean {
@@ -127,15 +144,16 @@ async function requestBackgroundSync(): Promise<void> {
   }
 }
 
-/** Enfileira a mutação e agenda a sincronização em segundo plano. */
+/** Enfileira a mutação do usuário ativo e agenda a sincronização em segundo plano. */
 async function queueMutation(
+  userId: string,
   key: string,
   method: string,
   path: string,
   body: unknown,
   csrf: string | undefined,
 ): Promise<void> {
-  await enqueueMutation(key, method, path, body, csrf);
+  await enqueueMutation(userId, key, method, path, body, csrf);
   await requestBackgroundSync();
 }
 
@@ -144,11 +162,12 @@ async function queueMutation(
  * Deve ser chamado quando a conexão retorna.
  */
 export async function replayQueue(): Promise<void> {
-  if (replaying || isOffline()) return;
+  if (replaying || isOffline() || activeUserId === null) return;
   replaying = true;
+  const userId = activeUserId;
 
   try {
-    const pending = await listPending();
+    const pending = await listPending(userId);
 
     for (const entry of pending) {
       try {
@@ -317,8 +336,21 @@ export async function apiRequest<T>(
 
   // Se estiver offline e for uma mutação, enfileira e retorna um envelope
   // simulado. A UI deve tratar isso como "pendente" e sincronizar depois.
-  if (isOffline() && isMutating && idempotencyKey !== undefined && !options.noOfflineQueue) {
-    await queueMutation(idempotencyKey, method, path, options.body, headers[CSRF_HEADER]);
+  // Login/registro nunca entram na fila: sem sessão, não há dono confiável.
+  const queueOwner = isMutating && idempotencyKey !== undefined && activeUserId !== null &&
+      !path.startsWith("/auth/") && !options.noOfflineQueue
+    ? activeUserId
+    : null;
+
+  if (isOffline() && queueOwner !== null && idempotencyKey !== undefined) {
+    await queueMutation(
+      queueOwner,
+      idempotencyKey,
+      method,
+      path,
+      options.body,
+      headers[CSRF_HEADER],
+    );
     return {
       data: undefined as T,
       meta: { requestId: "offline-queued" },
@@ -339,8 +371,15 @@ export async function apiRequest<T>(
     if (error instanceof DOMException && error.name === "AbortError") throw error;
 
     // Falha de rede: se for mutação e não desabilitou fila offline, enfileira.
-    if (isMutating && idempotencyKey !== undefined && !options.noOfflineQueue) {
-      await queueMutation(idempotencyKey, method, path, options.body, headers[CSRF_HEADER]);
+    if (queueOwner !== null && idempotencyKey !== undefined) {
+      await queueMutation(
+        queueOwner,
+        idempotencyKey,
+        method,
+        path,
+        options.body,
+        headers[CSRF_HEADER],
+      );
     }
 
     throw new ApiError(0, {

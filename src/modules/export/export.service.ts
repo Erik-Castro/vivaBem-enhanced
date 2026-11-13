@@ -134,9 +134,22 @@ export function formatMinor(minor: number): string {
   return `${sign}${integer}.${cents}`;
 }
 
+/**
+ * Escapa um campo CSV contra fórmula (CSV injection) e separadores.
+ *
+ * Valores iniciados por `=`, `+`, `-`, `@`, tab ou CR são interpretados como
+ * fórmula pelo Excel/Sheets. Prefixar com apóstrofo neutraliza a execução; a
+ * exceção são números puros (inclusive negativos), que precisam continuar
+ * numéricos nas colunas de valor.
+ */
 export function escapeCsv(value: string): string {
-  if (!/[",\n\r]/.test(value)) return value;
-  return `"${value.replaceAll('"', '""')}"`;
+  const plainNumber = /^[+-]?\d+(?:\.\d+)?$/.test(value);
+  // Primeiro, trata fórmulas: prefixa com apóstrofo se não for número puro
+  const withPrefix = !plainNumber && /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+
+  // Depois, envolve em aspas se contém separadores
+  if (!/[",\n\r]/.test(withPrefix)) return withPrefix;
+  return `"${withPrefix.replaceAll('"', '""')}"`;
 }
 
 export type { ExportTransactionCsvRow };

@@ -3,6 +3,7 @@ import { AppError } from "../../http/errors.ts";
 import { base64UrlDecode } from "../../shared/crypto/tokens.ts";
 import { applicationServerKey, parseVapidJwk } from "../../shared/crypto/vapid.ts";
 import { uuidv7 } from "../../shared/utils/uuid.ts";
+import { isAllowedPushEndpoint } from "./notifications.push.endpoint.ts";
 import type { NotificationsRepository } from "./notifications.repository.ts";
 import type { NotificationsPushRepository } from "./notifications.push.repository.ts";
 import type { PushSubscriptionInput, PushSubscriptionRecord } from "./notifications.push.types.ts";
@@ -70,7 +71,7 @@ export class NotificationsPushService {
 
   subscribe(userId: string, input: PushSubscriptionInput): SubscribePushResult {
     this.#assertEnabled();
-    validateSubscription(input);
+    validateSubscription(input, this.#config);
 
     const now = this.#now().toISOString();
     const subscription = this.#repository.upsert({
@@ -139,20 +140,16 @@ export class NotificationsPushService {
   }
 }
 
-function validateSubscription(input: PushSubscriptionInput): void {
+function validateSubscription(input: PushSubscriptionInput, config: PushConfig): void {
   const details: Array<{ path: string; message: string }> = [];
 
   if (input.endpoint.length > MAX_ENDPOINT_LENGTH) {
     details.push({ path: "endpoint", message: "endpoint muito longo" });
-  } else {
-    try {
-      const url = new URL(input.endpoint);
-      if (url.protocol !== "https:" && url.protocol !== "http:") {
-        details.push({ path: "endpoint", message: "endpoint deve ser http(s)" });
-      }
-    } catch {
-      details.push({ path: "endpoint", message: "endpoint inválido" });
-    }
+  } else if (!isAllowedPushEndpoint(input.endpoint, config.endpointHosts)) {
+    details.push({
+      path: "endpoint",
+      message: "endpoint deve usar https e um provedor de push permitido",
+    });
   }
 
   if (!isPoint(input.p256dh)) {

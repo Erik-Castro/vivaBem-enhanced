@@ -22,6 +22,11 @@ backups/
 # Ferramentas locais
 .codegraph/
 
+# Artefatos de teste manuais (contêm tokens de sessão)
+cookies*.txt
+*_cookies.txt
+*jar.txt
+
 # Projeto legado (somente leitura)
 reference_only/
 

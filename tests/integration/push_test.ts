@@ -25,6 +25,7 @@ const PUSH_ENV = {
   PUSH_VAPID_PUBLIC_KEY: JSON.stringify(EXPORTED_VAPID.publicKey),
   PUSH_VAPID_PRIVATE_KEY: JSON.stringify(EXPORTED_VAPID.privateKey),
   PUSH_VAPID_SUBJECT: "mailto:test@vivabem.local",
+  PUSH_ENDPOINT_HOSTS: "example.com",
 } satisfies Record<string, string>;
 
 const USER_ID = "01920000-0000-7000-8000-0000000000a1";
@@ -507,6 +508,156 @@ Deno.test("notificação de outro usuário não é entregue por engano", async (
     assertEquals(result, { claimed: 1, sent: 0, skipped: 1, failed: 0, revoked: 0 });
     assertEquals(sender.sent.length, 0);
     assertEquals(notificationState(database.db, "notification-bruno").push_state, "skipped");
+  } finally {
+    database.cleanup();
+  }
+});
+
+Deno.test("endpoint http:// é rejeitado na inscrição", async () => {
+  const app = await createTestApp({ env: PUSH_ENV });
+
+  try {
+    const client = await register(app.app, "push-http@example.com");
+    const response = await client.request("/api/v1/notifications/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody("http://push.example.com/device"),
+    });
+
+    assertEquals(response.status, 400);
+    const body = await response.json();
+    assertEquals(body.error.code, "VALIDATION_ERROR");
+    assertEquals(
+      body.error.details.some((d: { path: string; message: string }) =>
+        d.path === "endpoint" && d.message.includes("https")
+      ),
+      true,
+    );
+  } finally {
+    app.cleanup();
+  }
+});
+
+Deno.test("endpoint com IP literal é rejeitado na inscrição", async () => {
+  const app = await createTestApp({ env: PUSH_ENV });
+
+  try {
+    const client = await register(app.app, "push-ip@example.com");
+    const response = await client.request("/api/v1/notifications/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody("https://192.168.1.50/device"),
+    });
+
+    assertEquals(response.status, 400);
+    const body = await response.json();
+    assertEquals(body.error.code, "VALIDATION_ERROR");
+  } finally {
+    app.cleanup();
+  }
+});
+
+Deno.test("endpoint link-local (169.254.x.x) é rejeitado", async () => {
+  const app = await createTestApp({ env: PUSH_ENV });
+
+  try {
+    const client = await register(app.app, "push-linklocal@example.com");
+    const response = await client.request("/api/v1/notifications/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody("https://169.254.169.254/latest/meta-data/"),
+    });
+
+    assertEquals(response.status, 400);
+  } finally {
+    app.cleanup();
+  }
+});
+
+Deno.test("endpoint localhost é rejeitado", async () => {
+  const app = await createTestApp({ env: PUSH_ENV });
+
+  try {
+    const client = await register(app.app, "push-localhost@example.com");
+    const response = await client.request("/api/v1/notifications/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody("https://localhost:8080/device"),
+    });
+
+    assertEquals(response.status, 400);
+  } finally {
+    app.cleanup();
+  }
+});
+
+Deno.test("endpoint com credenciais na URL é rejeitado", async () => {
+  const app = await createTestApp({ env: PUSH_ENV });
+
+  try {
+    const client = await register(app.app, "push-creds@example.com");
+    const response = await client.request("/api/v1/notifications/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody("https://user:pass@push.example.com/device"),
+    });
+
+    assertEquals(response.status, 400);
+  } finally {
+    app.cleanup();
+  }
+});
+
+Deno.test("host fora da allowlist é rejeitado na inscrição", async () => {
+  const app = await createTestApp({ env: PUSH_ENV });
+
+  try {
+    const client = await register(app.app, "push-otherhost@example.com");
+    const response = await client.request("/api/v1/notifications/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody("https://evil.com/device"),
+    });
+
+    assertEquals(response.status, 400);
+  } finally {
+    app.cleanup();
+  }
+});
+
+Deno.test("subdomínio da allowlist é aceito", async () => {
+  const app = await createTestApp({ env: PUSH_ENV });
+
+  try {
+    const client = await register(app.app, "push-subdomain@example.com");
+    const response = await client.request("/api/v1/notifications/push/subscriptions", {
+      method: "POST",
+      body: subscriptionBody("https://updates.example.com/device"),
+    });
+
+    assertEquals(response.status, 201);
+  } finally {
+    app.cleanup();
+  }
+});
+
+Deno.test("dispatcher revoga assinatura legado com host fora da allowlist", async () => {
+  const database = await createTestDatabase();
+
+  try {
+    seedUser(database.db, USER_ID, "Ana");
+    seedNotification(database.db, "notification-legacy", USER_ID);
+
+    const repository = new NotificationsPushRepository(database.db);
+    repository.upsert({
+      id: "subscription-legacy",
+      userId: USER_ID,
+      endpoint: "https://evil.com/legacy",
+      p256dh: fakePoint(),
+      auth: base64UrlEncode(new Uint8Array(16).fill(3)),
+      userAgent: "legacy",
+      now: NOW.toISOString(),
+    });
+
+    const dispatcher = createDispatcher(database.db, new FakeSender());
+    const result = await dispatcher.runOnce();
+
+    assertEquals(result.revoked, 1);
+    assertEquals(repository.listActiveByUser(USER_ID).length, 0);
   } finally {
     database.cleanup();
   }

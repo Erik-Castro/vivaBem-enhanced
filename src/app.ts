@@ -240,7 +240,7 @@ export function createApp({
     logger,
   });
 
-  app.use("/api/v1/auth/*", ipBlocklist(db));
+  app.use("/api/v1/auth/*", ipBlocklist(db, config));
   app.use("*", csrfProtection(config));
   app.use("/api/v1/auth/register", rateLimit(rateLimiter, config, { scope: "auth-register" }));
   app.use("/api/v1/auth/login", rateLimit(rateLimiter, config, { scope: "auth-login" }));

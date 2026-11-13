@@ -1,4 +1,5 @@
-import { api, refreshSessionOnce, setAuthHooks, setCsrfToken } from "./api";
+import { api, refreshSessionOnce, setActiveUser, setAuthHooks, setCsrfToken } from "./api";
+import { clearQueue } from "./offline-queue";
 import { push } from "./push.svelte";
 import type { AuthPayload, MePayload, User } from "./types";
 
@@ -11,9 +12,12 @@ class AuthStore {
     setAuthHooks({
       refreshed: (user) => {
         this.user = user;
+        setActiveUser(user.id);
       },
       expired: () => {
         this.user = null;
+        // Impede replay da fila offline até uma nova sessão ser confirmada.
+        setActiveUser(null);
       },
     });
   }
@@ -24,8 +28,10 @@ class AuthStore {
     try {
       const me = await api<MePayload>("/me");
       this.user = me.user;
+      setActiveUser(me.user.id);
     } catch {
       this.user = null;
+      setActiveUser(null);
     } finally {
       this.ready = true;
     }
@@ -64,6 +70,8 @@ class AuthStore {
   }
 
   async logout(): Promise<void> {
+    const userId = this.user?.id ?? null;
+
     // O vínculo push é desfeito com a sessão ainda válida (CSRF necessário).
     await push.revokeOnLogout();
 
@@ -73,6 +81,13 @@ class AuthStore {
       // A sessão local é limpa mesmo quando o servidor não responde.
     } finally {
       this.user = null;
+      setActiveUser(null);
+
+      // Descarta mutações pendentes do usuário que saiu: outra conta no mesmo
+      // navegador não deve herdar nem reproduzir esses payloads.
+      if (userId !== null) {
+        await clearQueue(userId).catch(() => undefined);
+      }
     }
   }
 
@@ -85,6 +100,7 @@ class AuthStore {
   }
 
   private absorb(payload: AuthPayload): void {
+    setActiveUser(payload.user.id);
     setCsrfToken(payload.csrfToken);
     this.user = payload.user;
   }

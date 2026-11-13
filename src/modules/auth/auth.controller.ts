@@ -127,7 +127,7 @@ export function registerAuthRoutes(
   });
 
   app.openapi(registerRoute, async (c) => {
-    const result = await service.register(c.req.valid("json"), requestContext(c));
+    const result = await service.register(c.req.valid("json"), requestContext(c, config));
     setAuthCookies(c, config, result);
 
     return c.json(
@@ -148,7 +148,7 @@ export function registerAuthRoutes(
   });
 
   app.openapi(loginRoute, async (c) => {
-    const result = await service.login(c.req.valid("json"), requestContext(c));
+    const result = await service.login(c.req.valid("json"), requestContext(c, config));
     setAuthCookies(c, config, result);
 
     return c.json(
@@ -169,7 +169,7 @@ export function registerAuthRoutes(
   });
 
   app.openapi(refreshRoute, async (c) => {
-    const result = await service.refresh(getRefreshToken(c), requestContext(c));
+    const result = await service.refresh(getRefreshToken(c), requestContext(c, config));
     setAuthCookies(c, config, result);
 
     return c.json(
@@ -190,15 +190,18 @@ export function registerAuthRoutes(
   });
 
   app.openapi(logoutRoute, async (c) => {
-    await service.logout(getRefreshToken(c), c.get("sessionId"), requestContext(c));
+    await service.logout(getRefreshToken(c), c.get("sessionId"), requestContext(c, config));
     clearAuthCookies(c, config);
     return c.body(null, 204);
   });
 }
 
-function requestContext(c: Parameters<typeof clientIp>[0]): RequestContext {
+function requestContext(
+  c: Parameters<typeof clientIp>[0],
+  config: AppConfig,
+): RequestContext {
   return {
-    ipAddress: clientIp(c),
+    ipAddress: clientIp(c, config),
     userAgent: c.req.header("user-agent") ?? null,
   };
 }

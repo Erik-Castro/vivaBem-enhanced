@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { isValidDuration, parseDurationSeconds } from "./shared/utils/duration.ts";
+import { DEFAULT_TRUSTED_PROXY_CIDRS, isValidCidr } from "./shared/utils/ip.ts";
+import { DEFAULT_PUSH_ENDPOINT_HOSTS } from "./modules/notifications/notifications.push.endpoint.ts";
 import type { LogLevel } from "./shared/logger/index.ts";
 import { parseVapidJwk } from "./shared/crypto/vapid.ts";
 
@@ -40,6 +42,16 @@ export interface RateLimitConfig {
   readonly dataMax: number;
   /** Tamanho da janela deslizante em milissegundos. */
   readonly windowMs: number;
+  /**
+   * CIDRs cujo peer imediato é considerado proxy confiável. Enquanto o peer não
+   * pertencer a uma dessas faixas, `X-Forwarded-For` é ignorado.
+   */
+  readonly trustedProxyCidrs: readonly string[];
+  /**
+   * Quantos proxies confiáveis existem entre a API e o cliente. `1` cobre o
+   * Nginx local; atrás de ingress adicional (Tailscale/Umbrel), use `2` ou mais.
+   */
+  readonly trustedProxyHops: number;
 }
 
 /**
@@ -60,6 +72,8 @@ export interface PushConfig {
   /** Validade do claim de entrega antes de outro worker poder reassumir. */
   readonly claimLeaseMs: number;
   readonly batchSize: number;
+  /** Hosts aceitos no endpoint da assinatura (allowlist anti-SSRF). */
+  readonly endpointHosts: readonly string[];
 }
 
 export interface AppConfig {
@@ -159,6 +173,24 @@ const optionalInt = (min: number, max?: number) =>
       : z.coerce.number().int().min(min).max(max).optional(),
   );
 
+/** Lista separada por vírgulas; vazia usa o padrão informado. */
+const commaList = (fallback: readonly string[], validate: (value: string) => boolean) =>
+  z.preprocess(
+    (value) => {
+      const normalized = emptyToUndefined(value);
+      if (normalized === undefined) return [...fallback];
+      if (Array.isArray(normalized)) return normalized;
+      return String(normalized)
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter((entry) => entry !== "");
+    },
+    z.array(z.string().refine(validate, "valor inválido")).min(1),
+  );
+
+const HOSTNAME =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
 const duration = z
   .string()
   .refine(isValidDuration, "Use um formato de duração como 15m, 30d ou 3600s");
@@ -180,6 +212,8 @@ const rawConfigSchema = z.object({
   RATE_LIMIT_AUTH_MAX: z.coerce.number().int().min(1).max(10_000).default(5),
   RATE_LIMIT_DATA_MAX: z.coerce.number().int().min(1).max(10_000).default(30),
   RATE_LIMIT_WINDOW: duration.default("1m"),
+  TRUSTED_PROXY_CIDRS: commaList(DEFAULT_TRUSTED_PROXY_CIDRS, isValidCidr),
+  TRUSTED_PROXY_HOPS: z.coerce.number().int().min(1).max(10).default(1),
   AI_ENABLED: envBoolean(false),
   AI_PROVIDER: z.enum(AI_PROVIDERS).default("openai"),
   AI_API_BASE_URL: optionalUrl,
@@ -205,6 +239,10 @@ const rawConfigSchema = z.object({
   PUSH_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(3),
   PUSH_CLAIM_LEASE_MS: z.coerce.number().int().min(1_000).default(60_000),
   PUSH_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
+  PUSH_ENDPOINT_HOSTS: commaList(
+    DEFAULT_PUSH_ENDPOINT_HOSTS,
+    (value) => HOSTNAME.test(value),
+  ),
   // Worker independente. Sem valor, cada campo cai no equivalente de AI_* para
   // não quebrar `.env` existentes (ver `loadWorkerConfig`).
   WORKER_ID: optionalString,
@@ -271,6 +309,8 @@ export function loadConfig(
       authMax: raw.RATE_LIMIT_AUTH_MAX,
       dataMax: raw.RATE_LIMIT_DATA_MAX,
       windowMs: (parseDurationSeconds(raw.RATE_LIMIT_WINDOW) ?? 60) * 1_000,
+      trustedProxyCidrs: raw.TRUSTED_PROXY_CIDRS,
+      trustedProxyHops: raw.TRUSTED_PROXY_HOPS,
     },
     ai: toAiConfig(raw),
     push: toPushConfig(raw),
@@ -429,6 +469,7 @@ function toPushConfig(raw: RawConfig): PushConfig {
     maxAttempts: raw.PUSH_MAX_ATTEMPTS,
     claimLeaseMs: raw.PUSH_CLAIM_LEASE_MS,
     batchSize: raw.PUSH_BATCH_SIZE,
+    endpointHosts: raw.PUSH_ENDPOINT_HOSTS,
   };
 }
 
