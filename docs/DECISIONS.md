@@ -375,3 +375,37 @@ notificações). O worker não abandona o status `failed` legado de imediato —
 `010_worker.sql` mantém o valor no CHECK para permitir rollback de imagem — mas
 nenhum código novo o produz. SQLite continua single-writer: o worker não é uma
 forma de escalar escrita horizontalmente, apenas de isolar o consumo da IA.
+
+## ADR-036 — Idempotência só depois da autenticação
+
+**Decisão:** o middleware de idempotência é registrado por grupo autenticado,
+sempre depois do `requireAuth`, e nunca em `/api/v1/*` global. Rotas públicas de
+autenticação (register, login, logout, refresh) não participam da idempotência;
+CSRF, Origin e rate limit continuam valendo. Os padrões usam apenas `/*` porque
+no Hono `/x/*` também casa com `/x` (registrar os dois executa a idempotência
+duas vezes e colide na chave primária).
+
+**Motivo:** a idempotência precisa de `userId` para escopar a chave. Aplicada
+antes da autenticação, ela rejeitava com 401 qualquer requisição pública que
+trouxesse `Idempotency-Key` (o cliente web envia automaticamente).
+
+**Consequência:** um replay de login/registro não é deduplicado — o que é o
+comportamento correto, já que essas rotas não são mutações idempotentes de
+recursos do usuário. Qualquer grupo autenticado novo precisa declarar seu
+caminho na lista compartilhada `protectedPaths` em `src/app.ts`.
+
+## ADR-037 — Imutabilidade de tags publicadas
+
+**Decisão:** tags Git e de imagem no formato `X.Y.Z` são imutáveis depois de
+publicadas. Correções saem em um patch novo (`1.0.1`, `1.0.2`, ...) com tag e
+build próprios; `latest` é a única tag móvel e só avança junto com a versão
+mais recente.
+
+**Motivo:** sobrescrever uma tag quebra reprodutibilidade, invalida caches de
+registry e impede saber qual código está em produção. O `1.0.0` foi
+sobrescrito uma vez antes desta regra; o caminho formal passou a ser o `1.0.1`.
+
+**Consequência:** cada release exige bump no `deno.json`, seção no
+`CHANGELOG.md`, commit `chore(release)`, tag anotada e push das imagens com a
+tag nova. Rollback aponta para uma tag antiga intacta, nunca para um rebuild da
+mesma tag.
