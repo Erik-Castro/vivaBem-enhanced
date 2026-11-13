@@ -113,6 +113,10 @@ O `web/nginx.conf` resolve a API pelo nome `vivabem:3000`, então publique o
 frontend na mesma rede do Compose (ou ajuste o `proxy_pass`). A origem pública
 do frontend precisa ser igual a `APP_ORIGIN` da API.
 
+Tags de imagem já publicadas são imutáveis: para corrigir algo, suba a versão no
+`deno.json`, gere uma tag nova (`1.0.2`, ...) e publique essa tag; nunca
+sobrescreva `1.0.0`/`1.0.1`. `latest` pode acompanhar a última versão.
+
 ## Portainer
 
 1. **Stacks → Add stack**.

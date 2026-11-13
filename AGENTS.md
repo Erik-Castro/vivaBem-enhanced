@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão `1.0.0`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão `1.0.1`
 
 ---
 
@@ -47,7 +47,7 @@ consome a API em `/api/v1` pela mesma origem; o MVP está entregue.
 
 ## 3. Estado atual do repositório
 
-As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`), 8 (`0.9.0`), 9 (`0.10.0`), 10 (`0.11.0`), 11 (`0.12.0`) e 12 (`1.0.0`) estão concluídas. O que existe hoje:
+As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.6.0`), 6 (`0.7.0`), 7 (`0.8.0`), 8 (`0.9.0`), 9 (`0.10.0`), 10 (`0.11.0`), 11 (`0.12.0`) e 12 (`1.0.0`) estão concluídas, com a correção de autenticação publicada em `1.0.1`. O que existe hoje:
 
 | Item | Estado |
 |---|---|
@@ -581,6 +581,9 @@ Regras:
 
 - Formato `MAJOR.MINOR.PATCH`.
 - `0.y.z` durante desenvolvimento inicial; `1.0.0` quando a API v1 estiver congelada.
+- **Imutabilidade de release:** uma tag Git ou de imagem já publicada nunca é
+  sobrescrita. Correção nova = patch novo (`1.0.1`, `1.0.2`, ...) + tag nova;
+  `latest` pode avançar, mas as tags `X.Y.Z` ficam congeladas.
 - Tags Git `vX.Y.Z`, iguais à versão do `deno.json`.
 - Versão exposta em `deno.json`, `src/version.ts`, `/health`, OpenAPI e label Docker.
 - Versão do pacote ≠ versão da API: quebra de contrato exige `/api/v2` + MAJOR.
@@ -604,6 +607,8 @@ Regras:
 - Décima release: `0.10.0` (2026-11-09), publicada ao concluir a Fase 9.
 - Décima segunda release: `0.12.0` (2026-11-11), publicada ao concluir a Fase 11.
 - Décima terceira release: `1.0.0` (2026-11-11), publicada ao congelar a API v1.
+- Décima quarta release: `1.0.1` (2026-11-13), correção da idempotência nas rotas
+  de autenticação e do repasse de `AI_*` no Compose/Portainer.
 
 ### 11.3 Conventional Commits (recomendado)
 
@@ -616,8 +621,9 @@ Regras:
 2. Mover `[Unreleased]` para `[X.Y.Z] - AAAA-MM-DD`.
 3. Rodar `fmt`, `lint`, `check`, `test`.
 4. Commit `chore(release): vX.Y.Z`.
-5. Tag anotada `vX.Y.Z`.
-6. Build Docker com a mesma tag.
+5. Tag anotada `vX.Y.Z` e push de `main` + tag.
+6. Build Docker com a mesma tag e push sem sobrescrever tags já publicadas
+   (`latest` só avança junto com a versão nova).
 
 ---
 

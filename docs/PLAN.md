@@ -623,7 +623,8 @@ Worker (claim/lease)
 **Total da API: ~31–43 dias.** Frontend completo: ~15–20 dias; o MVP da Fase 10
 cobre fundação, autenticação, painel e finanças.
 
-Fases 0 a 12 concluídas e publicadas de `0.1.0` a `1.0.0`. Todas as telas do
+Fases 0 a 12 concluídas e publicadas de `0.1.0` a `1.0.0`, com a correção de
+autenticação publicada em `1.0.1`. Todas as telas do
 frontend estão entregues: fundação, autenticação, painel, contas, transações,
 categorias, orçamentos, metas, hábitos, investimentos, conquistas, notificações,
 insights, importação/exportação, família, PWA e deploy. A IA roda em processo

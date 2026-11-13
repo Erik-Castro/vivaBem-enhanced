@@ -5,6 +5,25 @@ Todas as mudanças notáveis deste projeto são documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/)
 e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+## [1.0.1] - 2026-11-13
+
+Release de correção da autenticação. A tag `1.0.0` permanece imutável; a
+correção sai como novo patch.
+
+### Fixed
+
+- Cadastro, login e logout voltaram a funcionar no cliente web: o middleware de
+  idempotência estava aplicado a `/api/v1/*` e exigia `userId`, então as rotas
+  públicas de autenticação respondiam 401 quando o frontend enviava o
+  `Idempotency-Key` automático. A idempotência agora é registrada apenas nos
+  grupos autenticados, sempre depois do `requireAuth`.
+- `compose.yaml` e `portainer-stack.yml` repassam as variáveis `AI_*` para a API
+  e publicam `host.docker.internal` (`host-gateway`) para o Ollama no host. Sem
+  isso, `AI_ENABLED=true` derrubava a API no boot (o provider caía no padrão
+  `openai` sem `AI_API_BASE_URL`) e o container não alcançava o Ollama local.
+
 ## [1.0.0] - 2026-11-11
 
 Primeira release estável: API v1 congelada.
@@ -27,20 +46,6 @@ Primeira release estável: API v1 congelada.
   cache em vez de reexecutar a operação.
 - Fila offline no cliente: mutações são enfileiradas em IndexedDB quando
   sem conexão e replayadas automaticamente ao retornar.
-
-## [Unreleased]
-
-### Fixed
-
-- Cadastro, login e logout voltaram a funcionar no cliente web: o middleware de
-  idempotência estava aplicado a `/api/v1/*` e exigia `userId`, então as rotas
-  públicas de autenticação respondiam 401 quando o frontend enviava o
-  `Idempotency-Key` automático. A idempotência agora é registrada apenas nos
-  grupos autenticados, sempre depois do `requireAuth`.
-- `compose.yaml` e `portainer-stack.yml` repassam as variáveis `AI_*` para a API
-  e publicam `host.docker.internal` (`host-gateway`) para o Ollama no host. Sem
-  isso, `AI_ENABLED=true` derrubava a API no boot (o provider caía no padrão
-  `openai` sem `AI_API_BASE_URL`) e o container não alcançava o Ollama local.
 
 ## [0.12.0] - 2026-11-11
 

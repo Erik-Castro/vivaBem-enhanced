@@ -23,14 +23,14 @@ Git. Não é necessário fazer push manual das imagens.
 5. Em **Environment variables**, adicione:
    - `APP_ORIGIN=https://app.seudominio.com`
    - `JWT_SECRET=<seu segredo de 32+ caracteres>`
-   - `VERSION=1.0.0`
+   - `VERSION=1.0.1`
    - `COOKIE_SECURE=true`
    - `ENV=production`
    - `AI_ENABLED=false` (ou `true` se quiser IA com provider configurado)
    - As demais variáveis do `.env.production.example` conforme necessário.
 6. Clique em **Deploy the stack**.
 
-O Portainer fará o build das imagens `vivabem:1.0.0` e `vivabem-web:1.0.0`
+O Portainer fará o build das imagens `vivabem:1.0.1` e `vivabem-web:1.0.1`
 localmente no endpoint Docker.
 
 ---
@@ -41,7 +41,7 @@ Se preferir construir as imagens fora do Portainer e usar um registry:
 
 ```bash
 # Na máquina com Docker disponível:
-VERSION=1.0.0
+VERSION=1.0.1
 
 # Build da API
 docker build --build-arg VERSION="$VERSION" -t registry.seudominio.com/vivabem:"$VERSION" .
@@ -60,10 +60,10 @@ registry em vez de build local:
 ```yaml
 services:
   vivabem:
-    image: registry.seudominio.com/vivabem:1.0.0
+    image: registry.seudominio.com/vivabem:1.0.1
     # ... restante sem a chave `build`
   web:
-    image: registry.seudominio.com/vivabem-web:1.0.0
+    image: registry.seudominio.com/vivabem-web:1.0.1
     # ... restante sem a chave `build`
 ```
 
@@ -135,6 +135,10 @@ os containers com healthcheck "Healthy".
 2. No Portainer, edite a stack e clique em **Update the stack**.
 3. O Portainer fará o rollout com zero downtime (graças ao `restart: unless-stopped`
    e ao healthcheck).
+
+> **Imutabilidade:** nunca reutilize uma tag `X.Y.Z` já publicada. Uma correção
+> sai como novo patch (`1.0.2`, ...) e a stack aponta para a tag nova. `latest`
+> pode acompanhar a última versão, mas não substitui a tag versionada.
 
 ---
 

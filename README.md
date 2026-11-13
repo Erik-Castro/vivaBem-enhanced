@@ -326,12 +326,14 @@ web/               # SPA Svelte 5 + Vite + PWA (Nginx no Compose)
 - [SemVer 2.0.0](https://semver.org/lang/pt-BR/): `MAJOR.MINOR.PATCH`.
 - [Keep a Changelog 1.1.0](https://keepachangelog.com/pt-BR/1.1.0/).
 - A versão do `deno.json` é a fonte da verdade e aparece em `/health`, no OpenAPI e na label Docker.
-- Durante `0.y.z` o contrato ainda pode mudar; `1.0.0` marca o congelamento da API v1.
+- Durante `0.y.z` o contrato ainda pode mudar; `1.0.0` marcou o congelamento da API v1.
+- Tags de imagem publicadas são imutáveis: correções saem em um novo patch (`1.0.1`, ...), nunca
+  sobrescrevendo a tag anterior.
 
 ## Status
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend
-Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão atual `1.0.0`. Todas as telas do
+Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão atual `1.0.1`. Todas as telas do
 frontend foram entregues: autenticação, painel, contas, transações, categorias, orçamentos, metas,
 hábitos, investimentos e conquistas. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
