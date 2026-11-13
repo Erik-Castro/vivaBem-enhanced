@@ -1,11 +1,18 @@
 import type { User } from "./types";
-import { enqueueMutation, listPending, removeFromQueue, pendingCount } from "./offline-queue";
+import {
+  enqueueMutation,
+  listPending,
+  pendingCount,
+  removeFromQueue,
+  updateCsrfSnapshot,
+} from "./offline-queue";
 
 const API_BASE = "/api/v1";
 const CSRF_COOKIE = "vb_csrf";
 const CSRF_HEADER = "X-CSRF-Token";
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const IDEMPOTENCY_HEADER = "Idempotency-Key";
+const OFFLINE_SYNC_TAG = "vivabem-flush";
 
 export interface ApiMeta {
   readonly requestId?: string;
@@ -81,6 +88,9 @@ export function setAuthHooks(hooks: AuthHooks): void {
 
 export function setCsrfToken(token: string): void {
   csrfMemory = token;
+  // Mantém o snapshot da fila offline alinhado com o token atual, para o
+  // service worker conseguir reproduzir mutações sem aba aberta.
+  void updateCsrfSnapshot(token).catch(() => undefined);
 }
 
 export function isOffline(): boolean {
@@ -89,6 +99,44 @@ export function isOffline(): boolean {
 
 export async function pendingMutationsCount(): Promise<number> {
   return pendingCount();
+}
+
+/**
+ * Agenda o flush da fila offline no service worker.
+ *
+ * Sem a Background Sync API (Firefox/Safari) a chamada falha em silêncio: o
+ * listener de `online` continua sendo o caminho de replay.
+ */
+async function requestBackgroundSync(): Promise<void> {
+  if (!("serviceWorker" in navigator)) return;
+
+  try {
+    // `ready` só resolve quando existe registro; em dev não há service worker.
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (registration === undefined) return;
+
+    const sync = (
+      registration as ServiceWorkerRegistration & {
+        readonly sync?: { readonly register: (tag: string) => Promise<void> };
+      }
+    ).sync;
+
+    await sync?.register(OFFLINE_SYNC_TAG);
+  } catch {
+    // API ausente, permissão negada ou contexto inseguro: não é erro de app.
+  }
+}
+
+/** Enfileira a mutação e agenda a sincronização em segundo plano. */
+async function queueMutation(
+  key: string,
+  method: string,
+  path: string,
+  body: unknown,
+  csrf: string | undefined,
+): Promise<void> {
+  await enqueueMutation(key, method, path, body, csrf);
+  await requestBackgroundSync();
 }
 
 /**
@@ -270,7 +318,7 @@ export async function apiRequest<T>(
   // Se estiver offline e for uma mutação, enfileira e retorna um envelope
   // simulado. A UI deve tratar isso como "pendente" e sincronizar depois.
   if (isOffline() && isMutating && idempotencyKey !== undefined && !options.noOfflineQueue) {
-    await enqueueMutation(idempotencyKey, method, path, options.body);
+    await queueMutation(idempotencyKey, method, path, options.body, headers[CSRF_HEADER]);
     return {
       data: undefined as T,
       meta: { requestId: "offline-queued" },
@@ -292,7 +340,7 @@ export async function apiRequest<T>(
 
     // Falha de rede: se for mutação e não desabilitou fila offline, enfileira.
     if (isMutating && idempotencyKey !== undefined && !options.noOfflineQueue) {
-      await enqueueMutation(idempotencyKey, method, path, options.body);
+      await queueMutation(idempotencyKey, method, path, options.body, headers[CSRF_HEADER]);
     }
 
     throw new ApiError(0, {

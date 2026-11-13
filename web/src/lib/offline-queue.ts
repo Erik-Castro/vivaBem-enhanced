@@ -13,6 +13,8 @@
  * - path: caminho da requisição (ex.: /api/v1/transactions)
  * - body: corpo serializado (JSON string ou null)
  * - createdAt: timestamp de criação
+ * - csrf: snapshot do token CSRF, usado pelo service worker quando não há
+ *   aba aberta para renovar a sessão (o worker não lê `document.cookie`)
  */
 
 const DB_NAME = "vivabem-offline-queue";
@@ -26,6 +28,7 @@ interface QueueEntry {
   path: string;
   body: string | null;
   createdAt: number;
+  csrf?: string;
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -65,6 +68,7 @@ export async function enqueueMutation(
   method: string,
   path: string,
   body: unknown,
+  csrf?: string,
 ): Promise<void> {
   const database = await openDB();
   const entry: QueueEntry = {
@@ -74,6 +78,7 @@ export async function enqueueMutation(
     path,
     body: body === undefined ? null : JSON.stringify(body),
     createdAt: Date.now(),
+    ...(csrf === undefined ? {} : { csrf }),
   };
 
   return new Promise((resolve, reject) => {
@@ -129,6 +134,31 @@ export async function clearQueue(): Promise<void> {
     const tx = database.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     store.clear();
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/**
+ * Atualiza o snapshot de CSRF de todas as entradas pendentes.
+ *
+ * O token é rotacionado pelo servidor; sem isso o replay no service worker
+ * acumularia 403 até a próxima vez que a aba estivesse aberta.
+ */
+export async function updateCsrfSnapshot(csrf: string): Promise<void> {
+  const entries = await listPending();
+  if (entries.length === 0) return;
+
+  const database = await openDB();
+
+  await new Promise<void>((resolve, reject) => {
+    const tx = database.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+
+    for (const entry of entries) {
+      store.put({ ...entry, csrf });
+    }
 
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);

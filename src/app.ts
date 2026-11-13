@@ -54,6 +54,9 @@ import { registerAchievementsRoutes } from "./modules/achievements/achievements.
 import { NotificationsRepository } from "./modules/notifications/notifications.repository.ts";
 import { NotificationsService } from "./modules/notifications/notifications.service.ts";
 import { registerNotificationsRoutes } from "./modules/notifications/notifications.controller.ts";
+import { NotificationsPushRepository } from "./modules/notifications/notifications.push.repository.ts";
+import { NotificationsPushService } from "./modules/notifications/notifications.push.service.ts";
+import { registerNotificationsPushRoutes } from "./modules/notifications/notifications.push.controller.ts";
 import { InsightsRepository } from "./modules/insights/insights.repository.ts";
 import { InsightsService } from "./modules/insights/insights.service.ts";
 import { registerInsightsRoutes } from "./modules/insights/insights.controller.ts";
@@ -203,6 +206,13 @@ export function createApp({
   const notificationsRepository = new NotificationsRepository(db);
   const notificationsService = new NotificationsService(notificationsRepository);
 
+  const notificationsPushRepository = new NotificationsPushRepository(db);
+  const notificationsPushService = new NotificationsPushService({
+    repository: notificationsPushRepository,
+    notifications: notificationsRepository,
+    config: config.push,
+  });
+
   const insightsRepository = new InsightsRepository(db);
   const insightsService = new InsightsService({
     repository: insightsRepository,
@@ -244,6 +254,11 @@ export function createApp({
   app.use(
     "/api/v1/export/*",
     rateLimit(rateLimiter, config, { scope: "export", max: config.rateLimit.dataMax }),
+  );
+  // O envio de teste cria uma notificação real: limite próprio evita spam.
+  app.use(
+    "/api/v1/notifications/push/test",
+    rateLimit(rateLimiter, config, { scope: "push-test", max: config.rateLimit.dataMax }),
   );
   // Grupos que exigem sessão. O padrão `*` do Hono também casa com o caminho
   // base (ex.: `/api/v1/accounts/*` cobre `/api/v1/accounts` e subrotas), então
@@ -347,6 +362,7 @@ export function createApp({
   registerInvestmentsRoutes(app, { service: investmentsService, config });
   registerAchievementsRoutes(app, { service: achievementsService, config });
   registerNotificationsRoutes(app, { service: notificationsService, config });
+  registerNotificationsPushRoutes(app, { service: notificationsPushService, config });
   registerInsightsRoutes(app, { service: insightsService, config });
   registerImportRoutes(app, { service: importService, config });
   registerExportRoutes(app, { service: exportService, config });

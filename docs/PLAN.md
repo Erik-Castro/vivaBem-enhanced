@@ -818,9 +818,12 @@ make web-build           # build de produção em web/dist
 
 A **Fase 12** (congelamento da API v1 → `1.0.0`) está concluída: o contrato da
 API v1 está estável em `/api/v1`; mudanças retrocompatíveis são aceitas, e
-remoções ou renomeações exigem `/api/v2` + release MAJOR. O próximo ciclo é
-operacional — monitorar dead letter, backups e prontidão — e qualquer nova
-funcionalidade exige escopo aprovado.
+remoções ou renomeações exigem `/api/v2` + release MAJOR. O incremento em curso é
+**push e uso offline**: Web Push/VAPID com entrega pelo worker, fila de mutações
+em IndexedDB, Background Sync híbrido e Periodic Sync para o badge (detalhes em
+[`FRONTEND.md`](FRONTEND.md) §4.11 e §6). O próximo ciclo é operacional —
+monitorar dead letter, backups e prontidão — e qualquer nova funcionalidade exige
+escopo aprovado.
 
 ---
 
@@ -854,8 +857,6 @@ Detalhes de arquitetura, rotas e operação: [`FRONTEND.md`](FRONTEND.md).
 ### 17.2 Pendente
 
 - Testes de componentes e E2E de UI no CI.
-- Fila offline/sincronização em segundo plano (hoje o app abre offline, mas
-  mutações falham com mensagem).
 
 ---
 

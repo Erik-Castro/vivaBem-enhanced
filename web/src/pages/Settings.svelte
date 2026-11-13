@@ -6,6 +6,7 @@
   import { auth } from "../lib/auth.svelte";
   import { formatDateTime } from "../lib/format";
   import { currencyOptions, localeOptions, timezoneOptions } from "../lib/labels";
+  import { push } from "../lib/push.svelte";
   import { router } from "../lib/router.svelte";
   import { toasts } from "../lib/toast.svelte";
   import type { MePayload, Session } from "../lib/types";
@@ -145,7 +146,41 @@
     return "Navegador";
   }
 
-  onMount(loadSessions);
+  async function togglePush(event: Event): Promise<void> {
+    const input = event.currentTarget as HTMLInputElement;
+    const wantsEnabled = input.checked;
+    const ok = wantsEnabled ? await push.enable() : await push.disable();
+
+    // O checkbox reflete o estado real: reverte quando a operação falhou.
+    input.checked = push.subscribed;
+
+    if (ok && wantsEnabled) {
+      toasts.success("Notificações push ativadas");
+    } else if (ok) {
+      toasts.push("Notificações push desativadas", "info");
+    } else if (push.blocked) {
+      toasts.error("Permissão de notificações bloqueada no navegador.");
+    } else if (push.error) {
+      toasts.error(push.error);
+    }
+  }
+
+  async function sendTestPush(): Promise<void> {
+    const ok = await push.sendTest();
+
+    if (ok) {
+      toasts.success("Aviso de teste enfileirado");
+    } else if (push.error) {
+      toasts.error(push.error);
+    }
+  }
+
+  onMount(() => {
+    void loadSessions();
+    // Revalida permissão e vínculo: o usuário pode ter mudado de ideia nas
+    // configurações do navegador desde o boot.
+    void push.refresh();
+  });
 </script>
 
 <div class="page-head">
@@ -258,6 +293,67 @@
     </form>
   </section>
 </div>
+
+<section class="card">
+  <header class="card-head">
+    <div>
+      <h3>Notificações push</h3>
+      <p>Avisos de orçamento, metas e conquistas mesmo com o app fechado.</p>
+    </div>
+  </header>
+
+  {#if !push.supported}
+    <p class="muted">
+      Este navegador não suporta notificações push. No iPhone, instale o app na tela de início
+      para habilitar.
+    </p>
+  {:else if !push.enabled}
+    <p class="muted">As notificações push estão desativadas neste servidor.</p>
+  {:else if push.blocked}
+    <div class="notice notice--error" role="alert">
+      <Icon name="alert" />
+      <div>
+        <strong>Permissão bloqueada</strong>
+        <p>Libere as notificações para este site nas configurações do navegador.</p>
+      </div>
+    </div>
+  {:else}
+    <div class="stack">
+      <label class="switch-row">
+        <span>
+          <strong>Receber notificações neste dispositivo</strong>
+          <small>
+            O navegador pedirá permissão na primeira ativação. Você pode desativar a qualquer
+            momento.
+          </small>
+        </span>
+        <input
+          type="checkbox"
+          class="switch"
+          checked={push.subscribed}
+          disabled={push.busy}
+          onchange={togglePush}
+        />
+      </label>
+
+      {#if push.subscribed}
+        <div class="form-actions form-actions--start">
+          <button class="btn btn--soft" type="button" onclick={sendTestPush} disabled={push.busy}>
+            {#if push.busy}<Spinner label="Enviando" />{/if}
+            Enviar aviso de teste
+          </button>
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if push.error && !push.blocked}
+    <div class="form-error" role="alert">
+      <Icon name="alert" size={18} />
+      <span>{push.error}</span>
+    </div>
+  {/if}
+</section>
 
 <section class="card">
   <header class="card-head">

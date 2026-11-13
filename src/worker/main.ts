@@ -3,6 +3,9 @@ import { createLogger } from "../shared/logger/index.ts";
 import { createDatabase } from "../db/client.ts";
 import { assertSchemaCurrent, loadMigrations, MigrationError } from "../db/migrate.ts";
 import { createAiPipeline } from "../ai/ai.runtime.ts";
+import { NotificationsPushRepository } from "../modules/notifications/notifications.push.repository.ts";
+import { PushDispatcher } from "../modules/notifications/notifications.push.dispatcher.ts";
+import { createPushSender } from "../modules/notifications/notifications.push.sender.ts";
 import { uuidv7 } from "../shared/utils/uuid.ts";
 import { WorkerRuntime } from "./runtime.ts";
 
@@ -27,11 +30,15 @@ function loadConfiguration(): WorkerConfig {
 const config = loadConfiguration();
 const logger = createLogger({ level: config.logLevel });
 
-// Sem IA habilitada não existe provedor nem consumidor: o processo encerra com
-// código 0 para que o supervisor (Docker, systemd) não o reinicie em loop.
-if (!config.ai.enabled) {
+const pushSender = await createPushSender(config.push).catch((error: unknown) => {
+  fatal(error instanceof Error ? error.message : String(error));
+});
+
+// Sem IA e sem push não existe trabalho: o processo encerra com código 0 para
+// que o supervisor (Docker, systemd) não o reinicie em loop.
+if (!config.ai.enabled && pushSender === null) {
   logger.info("worker_disabled", {
-    message: "AI_ENABLED=false; nenhum evento será processado",
+    message: "AI_ENABLED=false e PUSH_ENABLED=false; nada a processar",
   });
   Deno.exit(0);
 }
@@ -54,15 +61,14 @@ try {
   fatal(error instanceof Error ? error.message : String(error));
 }
 
-const pipeline = createAiPipeline({ db, config, logger });
+const pipeline = config.ai.enabled ? createAiPipeline({ db, config, logger }) : null;
 
-if (pipeline === null) {
-  // Inalcançável: o guarda acima já interrompeu quando a IA está desligada.
+if (config.ai.enabled && pipeline === null) {
   db.close();
   fatal("pipeline de IA indisponível com AI_ENABLED=true");
 }
 
-const runtime = new WorkerRuntime({
+const runtime = pipeline === null ? null : new WorkerRuntime({
   db,
   config,
   logger,
@@ -71,7 +77,19 @@ const runtime = new WorkerRuntime({
   workerId,
 });
 
-runtime.start();
+runtime?.start();
+
+// Push é independente da IA: o dispatcher só existe com PUSH_ENABLED=true e
+// reaproveita a mesma conexão/lease do processo.
+const pushDispatcher = pushSender === null ? null : new PushDispatcher({
+  repository: new NotificationsPushRepository(db),
+  sender: pushSender,
+  config: config.push,
+  logger,
+  workerId,
+});
+
+pushDispatcher?.start();
 
 let shuttingDown = false;
 
@@ -82,7 +100,8 @@ async function shutdown(signal: string): Promise<void> {
   logger.info("shutdown_started", { signal, workerId });
 
   try {
-    await runtime.stop();
+    await runtime?.stop();
+    await pushDispatcher?.stop();
   } catch (error) {
     logger.error("worker_stop_failed", {
       workerId,

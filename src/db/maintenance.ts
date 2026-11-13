@@ -13,14 +13,15 @@ export interface MaintenanceResult {
   readonly completedEvents: number;
   readonly expiredIpBlocks: number;
   readonly orphanEmbeddings: number;
+  readonly revokedPushSubscriptions: number;
 }
 
 /**
  * Limpeza periódica de dados operacionais.
  *
  * Nunca remove dados de domínio do usuário: apenas sessões já expiradas,
- * eventos de outbox concluídos, bloqueios de IP vencidos e embeddings cujo
- * insight de origem não existe mais.
+ * eventos de outbox concluídos, bloqueios de IP vencidos, embeddings cujo
+ * insight de origem não existe mais e assinaturas push já revogadas.
  */
 export function runMaintenance(
   db: AppDatabase,
@@ -59,6 +60,20 @@ export function runMaintenance(
       )
       .run().changes;
 
-    return { expiredSessions, completedEvents, expiredIpBlocks, orphanEmbeddings };
+    // A assinatura revogada só serve para auditoria recente; o endpoint já não
+    // recebe entrega e o usuário pode reassinar quando quiser.
+    const revokedPushSubscriptions = db
+      .prepare<[string]>(
+        "DELETE FROM push_subscriptions WHERE revoked_at IS NOT NULL AND revoked_at <= ?",
+      )
+      .run(cutoff).changes;
+
+    return {
+      expiredSessions,
+      completedEvents,
+      expiredIpBlocks,
+      orphanEmbeddings,
+      revokedPushSubscriptions,
+    };
   });
 }

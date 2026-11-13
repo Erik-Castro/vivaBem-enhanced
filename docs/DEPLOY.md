@@ -32,29 +32,51 @@ O frontend fica em `http://localhost:${WEB_PORT:-8080}` e encaminha `/api`,
 Para parar sem perder dados: `make down` (os volumes `vivabem-data` e
 `vivabem-backups` permanecem).
 
-### Worker de IA (perfil `ai`)
+### Worker de IA (perfis `ai` e `push`)
 
-O consumidor do outbox é um serviço separado, com a mesma imagem e o mesmo
-volume SQLite. Ele só sobe quando o perfil `ai` é ativado; a API funciona sem
-ele.
+O consumidor do outbox e das notificações push é um serviço separado, com a
+mesma imagem e o mesmo volume SQLite. Ele sobe quando o perfil `ai` e/ou `push`
+é ativado; a API funciona sem ele (sem IA, sem push).
 
 ```bash
-# Sobe API + frontend + worker
-docker compose --profile ai up -d --build
+# Sobe API + frontend + worker (IA e push)
+docker compose --profile ai --profile push up -d --build
 
-# Só o worker (API já em execução)
-docker compose --profile ai up -d worker
+# Só o worker de push (API já em execução)
+docker compose --profile push up -d worker
 
 docker compose logs -f worker
 ```
 
-- Sem `AI_ENABLED=true` o worker registra `worker_disabled` e encerra com
-  código 0; por isso o perfil existe: não faz sentido manter um processo ocioso.
+- Com `AI_ENABLED=false` **e** `PUSH_ENABLED=false` o worker registra
+  `worker_disabled` e encerra com código 0; por isso o perfil existe: não faz
+  sentido manter um processo ocioso.
 - O worker **não migra**. Se a API ainda não aplicou o schema, ele sai com
   erro `Schema desatualizado` e o `restart` tenta de novo até o banco estar ok.
 - `stop_grace_period: 35s` é maior que `WORKER_SHUTDOWN_GRACE_MS` (30s) para o
   encerramento gracioso terminar antes do `SIGKILL`.
 - A entrega é pelo menos uma vez; handlers deduplicam por `dedupe_key`.
+- Push usa a própria linha de `notifications` (`push_state`) com claim/lease, sem
+  evento novo na outbox.
+
+### Chaves VAPID
+
+Push exige um par de chaves EC P-256 fixo por instalação:
+
+```bash
+deno task push:keys
+# PUSH_ENABLED=true
+# PUSH_VAPID_PUBLIC_KEY='{"kty":"EC",...}'
+# PUSH_VAPID_PRIVATE_KEY='{"kty":"EC",...}'
+# PUSH_VAPID_SUBJECT='mailto:voce@exemplo.com'
+```
+
+- Cole as três variáveis no `.env`/Portainer e repasse ao serviço `worker`.
+- `PUSH_VAPID_SUBJECT` precisa ser `mailto:` ou `https://` (RFC 8292).
+- Trocar o par invalida as assinaturas existentes; os navegadores renovam na
+  próxima abertura do app (o service worker avisa a aba).
+- Push exige HTTPS no navegador (ou `localhost`); em HTTP puro o botão de
+  ativar não aparece.
 
 ### Ollama acessível pelo container
 
@@ -144,6 +166,15 @@ sobrescreva `1.0.0`/`1.0.1`. `latest` pode acompanhar a última versão.
 | `WORKER_MAX_ATTEMPTS` | não | Tentativas antes do dead letter (padrão 5) |
 | `WORKER_POLL_INTERVAL_MS` | não | Intervalo de polling (padrão 1000) |
 | `WORKER_SHUTDOWN_GRACE_MS` | não | Espera no shutdown gracioso (padrão 30000) |
+| `PUSH_ENABLED` | não | Liga Web Push; exige as três variáveis VAPID |
+| `PUSH_VAPID_PUBLIC_KEY` | com push | JWK público gerado por `deno task push:keys` |
+| `PUSH_VAPID_PRIVATE_KEY` | com push | JWK privado; nunca commitar |
+| `PUSH_VAPID_SUBJECT` | com push | `mailto:` ou `https://` (RFC 8292) |
+| `PUSH_TTL_SECONDS` | não | Padrão 86400; máximo 2419200 (4 semanas) |
+| `PUSH_DISPATCH_INTERVAL` | não | Intervalo da fila de push (padrão 15000 ms) |
+| `PUSH_BATCH_SIZE` | não | Notificações por ciclo (padrão 20) |
+| `PUSH_MAX_ATTEMPTS` | não | Tentativas antes de `failed` (padrão 3) |
+| `PUSH_CLAIM_LEASE_MS` | não | Validade do claim de entrega (padrão 60000) |
 | `LOG_LEVEL` | não | `info` em produção |
 
 Lista completa: `.env.example`.
@@ -245,8 +276,10 @@ falha for de configuração (provider, chave, modelo), corrija antes de reenviar
 - [ ] Backup diário agendado, cópia off-host e restore testado.
 - [ ] `/health` e `/ready` monitorados; logs JSON coletados.
 - [ ] `AI_ENABLED=false` até o usuário autorizar; chaves de IA só no ambiente.
-- [ ] Worker no perfil `ai` monitorado quando a IA estiver ligada; logs em
-      `worker_started`/`worker_stats`/`worker_stopped`.
+- [ ] Worker no perfil `ai` e/ou `push` monitorado conforme o recurso ligado;
+      logs em `worker_started`/`worker_stats`/`worker_stopped`/`push_dispatch`.
+- [ ] Push com par VAPID próprio, `PUSH_VAPID_SUBJECT` válido e worker de push
+      no ar (`push_dispatch` nos logs).
 - [ ] Eventos em `dead_letter` revisados e reenviados com `outbox:replay`.
 - [ ] Rate limits revisados para o tráfego esperado.
 - [ ] Uma única instância (SQLite é single-writer).
@@ -260,5 +293,8 @@ falha for de configuração (provider, chave, modelo), corrija antes de reenviar
   o shutdown força checkpoint.
 - Sem conversão cambial: resumos não somam moedas diferentes.
 - O rate limiter é em memória; reiniciar o processo zera as janelas.
-- O service worker não faz cache de dados nem fila de mutações: offline, o app
-  abre mas ações de escrita falham com mensagem de erro.
+- A fila offline cobre apenas mutações e depende de Background Sync (parcial em
+  Firefox/Safari); sem ela, o replay acontece na próxima abertura do app.
+- Push depende do serviço de push do navegador (FCM/APNs/Mozilla); a entrega é
+  at-least-once e pode atrasar quando o dispositivo está em economia de bateria.
+- Sem cache offline de leituras: abrir uma tela nova sem rede mostra erro.

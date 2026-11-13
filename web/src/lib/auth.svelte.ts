@@ -1,4 +1,5 @@
 import { api, refreshSessionOnce, setAuthHooks, setCsrfToken } from "./api";
+import { push } from "./push.svelte";
 import type { AuthPayload, MePayload, User } from "./types";
 
 class AuthStore {
@@ -63,6 +64,9 @@ class AuthStore {
   }
 
   async logout(): Promise<void> {
+    // O vínculo push é desfeito com a sessão ainda válida (CSRF necessário).
+    await push.revokeOnLogout();
+
     try {
       await api<void>("/auth/logout", { method: "POST", retry: false });
     } catch {

@@ -4,6 +4,7 @@
   import Icon from "./components/Icon.svelte";
   import type { IconName } from "./lib/icons";
   import { auth } from "./lib/auth.svelte";
+  import { push } from "./lib/push.svelte";
   import { router } from "./lib/router.svelte";
   import Accounts from "./pages/Accounts.svelte";
   import Budgets from "./pages/Budgets.svelte";
@@ -35,6 +36,18 @@
 
   onMount(() => {
     void auth.init();
+  });
+
+  // Reconcilia o vínculo push quando a sessão aparece (login ou boot) e limpa
+  // o estado local quando ela termina.
+  $effect(() => {
+    if (!auth.ready) return;
+
+    if (auth.user) {
+      void push.refresh();
+    } else {
+      push.reset();
+    }
   });
 
   $effect(() => {

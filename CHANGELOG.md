@@ -7,6 +7,39 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added
+
+- Notificações push (Web Push + VAPID) de ponta a ponta: `PUSH_ENABLED` e as
+  chaves VAPID no ambiente, `GET /notifications/push/key`,
+  `POST|GET|DELETE /notifications/push/subscriptions` e
+  `POST /notifications/push/test` (`202`). A entrega usa a própria linha de
+  `notifications` (`push_state`, claim/lease) e roda no worker, sem depender da
+  IA; `404`/`410` do serviço de push revogam a assinatura.
+- `deno task push:keys` gera o par VAPID em JWK para colar no `.env`/Portainer.
+- Manifest PWA gerado com `id: "/"`,
+  `display_override: ["standalone", "minimal-ui"]` e
+  `categories: ["finance", "productivity", "lifestyle"]`.
+- Fila de mutações offline em IndexedDB com `Idempotency-Key` e snapshot de
+  CSRF, reproduzida ao voltar a conexão (aba aberta) ou por Background Sync
+  (`vivabem-flush`) com o app fechado.
+- Periodic Background Sync (`vivabem-refresh`, `minInterval` 24h) para atualizar
+  o badge de notificações não lidas.
+- Tela **Configurações → Notificações push**: ativar/desativar o dispositivo,
+  estado de permissão e envio de aviso de teste.
+- `PUSH_DISABLED` (`503`) na taxonomia de erros para instalações com push
+  desligado.
+
+### Changed
+
+- O service worker passou a usar `strategies: "injectManifest"` com handler
+  próprio (`web/src/sw.ts`), necessário para `push`/`notificationclick`/`sync`
+  e `periodicsync`; o tipo do worker é validado por `tsconfig.sw.json`.
+- O worker independente também entrega push: ele sobe com `AI_ENABLED` ou
+  `PUSH_ENABLED` e só encerra quando os dois estão desligados. No Compose ele
+  atende aos perfis `ai` e `push`.
+- A manutenção periódica remove assinaturas push revogadas antigas
+  (`revokedPushSubscriptions`).
+
 ## [1.0.1] - 2026-11-13
 
 Release de correção da autenticação. A tag `1.0.0` permanece imutável; a

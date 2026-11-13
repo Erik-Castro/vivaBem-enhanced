@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isValidDuration, parseDurationSeconds } from "./shared/utils/duration.ts";
 import type { LogLevel } from "./shared/logger/index.ts";
+import { parseVapidJwk } from "./shared/crypto/vapid.ts";
 
 export const APP_ENVS = ["development", "test", "production"] as const;
 export type AppEnv = (typeof APP_ENVS)[number];
@@ -41,6 +42,26 @@ export interface RateLimitConfig {
   readonly windowMs: number;
 }
 
+/**
+ * Configuração de notificações push (Web Push + VAPID).
+ *
+ * As chaves são JWK serializados em JSON. Sem `PUSH_ENABLED=true` o recurso
+ * fica inteiramente desligado: nenhuma rota entrega subscriptions e o worker
+ * não varre a fila.
+ */
+export interface PushConfig {
+  readonly enabled: boolean;
+  readonly vapidPublicKey?: string;
+  readonly vapidPrivateKey?: string;
+  readonly subject: string;
+  readonly ttlSeconds: number;
+  readonly dispatchIntervalMs: number;
+  readonly maxAttempts: number;
+  /** Validade do claim de entrega antes de outro worker poder reassumir. */
+  readonly claimLeaseMs: number;
+  readonly batchSize: number;
+}
+
 export interface AppConfig {
   readonly env: AppEnv;
   readonly isProduction: boolean;
@@ -58,6 +79,7 @@ export interface AppConfig {
   readonly vectorExtensionPath?: string;
   readonly rateLimit: RateLimitConfig;
   readonly ai: AiConfig;
+  readonly push: PushConfig;
 }
 
 /** Parâmetros operacionais do processo de consumo da outbox. */
@@ -86,6 +108,7 @@ export interface WorkerConfig {
   readonly logLevel: LogLevel;
   readonly vectorExtensionPath?: string;
   readonly ai: AiConfig;
+  readonly push: PushConfig;
   readonly worker: WorkerRuntimeConfig;
 }
 
@@ -172,6 +195,16 @@ const rawConfigSchema = z.object({
   AI_CORRELATION_THRESHOLD: z.coerce.number().int().min(1).default(50),
   AI_OLLAMA_URL: z.string().url().default("http://localhost:11434"),
   AI_MODEL: optionalString,
+  PUSH_ENABLED: envBoolean(false),
+  PUSH_VAPID_PUBLIC_KEY: optionalString,
+  PUSH_VAPID_PRIVATE_KEY: optionalString,
+  PUSH_VAPID_SUBJECT: optionalString,
+  // 2.419.200 s (4 semanas) é o máximo aceito pelos serviços de push.
+  PUSH_TTL_SECONDS: z.coerce.number().int().min(0).max(2_419_200).default(86_400),
+  PUSH_DISPATCH_INTERVAL: z.coerce.number().int().min(1_000).default(15_000),
+  PUSH_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(3),
+  PUSH_CLAIM_LEASE_MS: z.coerce.number().int().min(1_000).default(60_000),
+  PUSH_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
   // Worker independente. Sem valor, cada campo cai no equivalente de AI_* para
   // não quebrar `.env` existentes (ver `loadWorkerConfig`).
   WORKER_ID: optionalString,
@@ -211,6 +244,7 @@ export function loadConfig(
   }
 
   assertAiConfig(raw);
+  assertPushConfig(raw);
 
   const cookieSecure = raw.COOKIE_SECURE === "auto" ? isProduction : raw.COOKIE_SECURE === "true";
   const jwtSecretIsEphemeral = raw.JWT_SECRET === undefined;
@@ -239,6 +273,7 @@ export function loadConfig(
       windowMs: (parseDurationSeconds(raw.RATE_LIMIT_WINDOW) ?? 60) * 1_000,
     },
     ai: toAiConfig(raw),
+    push: toPushConfig(raw),
   };
 }
 
@@ -256,6 +291,7 @@ export function loadWorkerConfig(
 ): WorkerConfig {
   const raw = parseEnv(env);
   assertAiConfig(raw);
+  assertPushConfig(raw);
 
   const heartbeatMs = raw.WORKER_HEARTBEAT_MS ?? 15_000;
   const leaseMs = raw.WORKER_LEASE_MS ?? Math.max(60_000, raw.AI_REQUEST_TIMEOUT * 2);
@@ -273,6 +309,7 @@ export function loadWorkerConfig(
     logLevel: raw.LOG_LEVEL,
     vectorExtensionPath: raw.VECTOR_EXTENSION_PATH,
     ai: toAiConfig(raw),
+    push: toPushConfig(raw),
     worker: {
       id: raw.WORKER_ID,
       pollIntervalMs: raw.WORKER_POLL_INTERVAL_MS ?? raw.AI_WORKER_INTERVAL,
@@ -330,6 +367,69 @@ function assertAiConfig(raw: RawConfig): void {
       "AI_EMBEDDING_DIMENSIONS: obrigatório quando AI_ENABLED=true",
     ]);
   }
+}
+
+/**
+ * Regras de push compartilhadas entre API e worker.
+ *
+ * As três variáveis VAPID são obrigatórias juntas: chave sem sujeito (ou
+ * vice-versa) produziria 401 do serviço de push em produção, um erro que só
+ * apareceria no envio.
+ */
+function assertPushConfig(raw: RawConfig): void {
+  if (!raw.PUSH_ENABLED) return;
+
+  const missing: string[] = [];
+  if (raw.PUSH_VAPID_PUBLIC_KEY === undefined) missing.push("PUSH_VAPID_PUBLIC_KEY");
+  if (raw.PUSH_VAPID_PRIVATE_KEY === undefined) missing.push("PUSH_VAPID_PRIVATE_KEY");
+  if (raw.PUSH_VAPID_SUBJECT === undefined) missing.push("PUSH_VAPID_SUBJECT");
+
+  if (missing.length > 0) {
+    throw new ConfigError(
+      "Configuração de ambiente inválida",
+      missing.map((name) => `${name}: obrigatório quando PUSH_ENABLED=true`),
+    );
+  }
+
+  const subject = raw.PUSH_VAPID_SUBJECT ?? "";
+  if (!subject.startsWith("mailto:") && !subject.startsWith("https://")) {
+    throw new ConfigError("Configuração de ambiente inválida", [
+      "PUSH_VAPID_SUBJECT: use mailto:<email> ou https://<url>",
+    ]);
+  }
+
+  const publicKey = raw.PUSH_VAPID_PUBLIC_KEY === undefined
+    ? null
+    : parseVapidJwk(raw.PUSH_VAPID_PUBLIC_KEY);
+  const privateKey = raw.PUSH_VAPID_PRIVATE_KEY === undefined
+    ? null
+    : parseVapidJwk(raw.PUSH_VAPID_PRIVATE_KEY);
+
+  const details: string[] = [];
+  if (publicKey === null) {
+    details.push("PUSH_VAPID_PUBLIC_KEY: JWK EC P-256 inválido (x e y em base64url)");
+  }
+  if (privateKey === null || privateKey.d === undefined) {
+    details.push("PUSH_VAPID_PRIVATE_KEY: JWK EC P-256 inválido (x, y e d em base64url)");
+  }
+
+  if (details.length > 0) {
+    throw new ConfigError("Configuração de ambiente inválida", details);
+  }
+}
+
+function toPushConfig(raw: RawConfig): PushConfig {
+  return {
+    enabled: raw.PUSH_ENABLED,
+    vapidPublicKey: raw.PUSH_VAPID_PUBLIC_KEY,
+    vapidPrivateKey: raw.PUSH_VAPID_PRIVATE_KEY,
+    subject: raw.PUSH_VAPID_SUBJECT ?? "mailto:noreply@vivabem.local",
+    ttlSeconds: raw.PUSH_TTL_SECONDS,
+    dispatchIntervalMs: raw.PUSH_DISPATCH_INTERVAL,
+    maxAttempts: raw.PUSH_MAX_ATTEMPTS,
+    claimLeaseMs: raw.PUSH_CLAIM_LEASE_MS,
+    batchSize: raw.PUSH_BATCH_SIZE,
+  };
 }
 
 function toAiConfig(raw: RawConfig): AiConfig {

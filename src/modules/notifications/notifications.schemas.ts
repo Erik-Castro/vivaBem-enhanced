@@ -62,3 +62,65 @@ export const MarkAllReadResponseSchema = z
     meta: MetaSchema,
   })
   .openapi("MarkAllReadResponse");
+
+export const PushKeyResponseSchema = z
+  .object({
+    data: z.object({
+      enabled: z.boolean(),
+      /** Ponto não comprimido P-256 em base64url, para `applicationServerKey`. */
+      publicKey: z.string().nullable(),
+    }),
+    meta: MetaSchema,
+  })
+  .openapi("PushKeyResponse");
+
+export const PushSubscriptionSchema = z
+  .object({
+    id: z.string(),
+    endpoint: z.string(),
+    createdAt: z.string(),
+    lastSeenAt: z.string(),
+  })
+  .openapi("PushSubscription");
+
+export const PushSubscriptionBodySchema = z
+  .object({
+    endpoint: z.string().url().max(2_048),
+    keys: z.object({
+      p256dh: z.string().min(1).max(255),
+      auth: z.string().min(1).max(255),
+    }),
+  })
+  .openapi("PushSubscriptionBody");
+
+export const PushUnsubscribeBodySchema = z
+  .object({ endpoint: z.string().url().max(2_048) })
+  .openapi("PushUnsubscribeBody");
+
+export const PushSubscriptionListResponseSchema = z
+  .object({
+    data: z.object({ subscriptions: z.array(PushSubscriptionSchema) }),
+    meta: MetaSchema,
+  })
+  .openapi("PushSubscriptionListResponse");
+
+export const PushSubscriptionResponseSchema = z
+  .object({
+    data: z.object({ subscription: PushSubscriptionSchema }),
+    meta: MetaSchema,
+  })
+  .openapi("PushSubscriptionResponse");
+
+export const PushUnsubscribeResponseSchema = z
+  .object({
+    data: z.object({ revoked: z.literal(true) }),
+    meta: MetaSchema,
+  })
+  .openapi("PushUnsubscribeResponse");
+
+export const PushTestResponseSchema = z
+  .object({
+    data: z.object({ notificationId: z.string() }),
+    meta: MetaSchema,
+  })
+  .openapi("PushTestResponse");

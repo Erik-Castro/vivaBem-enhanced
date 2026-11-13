@@ -1,5 +1,6 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertThrows } from "@std/assert";
 import { ConfigError, loadConfig, loadWorkerConfig } from "../../src/config.ts";
+import { base64UrlEncode } from "../../src/shared/crypto/tokens.ts";
 
 Deno.test("config usa defaults de desenvolvimento", () => {
   const config = loadConfig({});
@@ -126,4 +127,94 @@ Deno.test("worker exige heartbeat menor que o lease", () => {
 Deno.test("worker rejeita concorrência fora da faixa", () => {
   assertThrows(() => loadWorkerConfig({ WORKER_CONCURRENCY: "9" }), ConfigError);
   assertThrows(() => loadWorkerConfig({ WORKER_CONCURRENCY: "0" }), ConfigError);
+});
+
+const VAPID_PUBLIC = JSON.stringify({
+  kty: "EC",
+  crv: "P-256",
+  x: base64UrlEncode(new Uint8Array(32).fill(1)),
+  y: base64UrlEncode(new Uint8Array(32).fill(2)),
+});
+const VAPID_PRIVATE = JSON.stringify({
+  kty: "EC",
+  crv: "P-256",
+  x: base64UrlEncode(new Uint8Array(32).fill(1)),
+  y: base64UrlEncode(new Uint8Array(32).fill(2)),
+  d: base64UrlEncode(new Uint8Array(32).fill(3)),
+});
+
+const PUSH_ENV = {
+  PUSH_ENABLED: "true",
+  PUSH_VAPID_PUBLIC_KEY: VAPID_PUBLIC,
+  PUSH_VAPID_PRIVATE_KEY: VAPID_PRIVATE,
+  PUSH_VAPID_SUBJECT: "mailto:test@vivabem.local",
+};
+
+Deno.test("push vem desligado por padrão", () => {
+  const config = loadConfig({});
+
+  assertEquals(config.push.enabled, false);
+  assertEquals(config.push.ttlSeconds, 86_400);
+  assertEquals(config.push.maxAttempts, 3);
+  assertEquals(config.push.batchSize, 20);
+});
+
+Deno.test("push habilitado exige as três variáveis VAPID", () => {
+  const error = assertThrows(
+    () => loadConfig({ PUSH_ENABLED: "true" }),
+    ConfigError,
+  ) as ConfigError;
+
+  assertEquals(error.details.length, 3);
+  assert(error.details.some((detail) => detail.startsWith("PUSH_VAPID_PUBLIC_KEY:")));
+});
+
+Deno.test("push exige sujeito mailto ou https", () => {
+  assertThrows(
+    () => loadConfig({ ...PUSH_ENV, PUSH_VAPID_SUBJECT: "test@vivabem.local" }),
+    ConfigError,
+  );
+});
+
+Deno.test("push rejeita JWK fora do padrão EC P-256", () => {
+  assertThrows(
+    () => loadConfig({ ...PUSH_ENV, PUSH_VAPID_PUBLIC_KEY: JSON.stringify({ kty: "RSA" }) }),
+    ConfigError,
+  );
+
+  assertThrows(
+    () =>
+      loadConfig({
+        ...PUSH_ENV,
+        PUSH_VAPID_PRIVATE_KEY: JSON.stringify({
+          kty: "EC",
+          crv: "P-256",
+          x: base64UrlEncode(new Uint8Array(32).fill(1)),
+          y: base64UrlEncode(new Uint8Array(32).fill(2)),
+        }),
+      }),
+    ConfigError,
+  );
+});
+
+Deno.test("push habilitado com configuração completa", () => {
+  const config = loadConfig({
+    ...PUSH_ENV,
+    PUSH_TTL_SECONDS: "3600",
+    PUSH_DISPATCH_INTERVAL: "5000",
+    PUSH_MAX_ATTEMPTS: "5",
+  });
+
+  assertEquals(config.push.enabled, true);
+  assertEquals(config.push.subject, "mailto:test@vivabem.local");
+  assertEquals(config.push.ttlSeconds, 3_600);
+  assertEquals(config.push.dispatchIntervalMs, 5_000);
+  assertEquals(config.push.maxAttempts, 5);
+  assertEquals(config.push.vapidPublicKey, VAPID_PUBLIC);
+});
+
+Deno.test("worker carrega a configuração de push", () => {
+  const config = loadWorkerConfig(PUSH_ENV);
+  assertEquals(config.push.enabled, true);
+  assertEquals(config.push.vapidPrivateKey, VAPID_PRIVATE);
 });

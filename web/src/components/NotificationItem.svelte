@@ -7,7 +7,8 @@
     notificationCategoryLabel,
     notificationSeverityLabel,
   } from "../lib/labels";
-  import { notifications, resolveNotificationLink } from "../lib/notifications.svelte";
+  import { notifications } from "../lib/notifications.svelte";
+  import { resolveNotificationLink } from "../lib/notification-links";
   import { router } from "../lib/router.svelte";
   import { toasts } from "../lib/toast.svelte";
   import type { Notification } from "../lib/types";

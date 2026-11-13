@@ -132,6 +132,7 @@ Deno.test("manutenção remove apenas dados operacionais vencidos", async () => 
       completedEvents: 1,
       expiredIpBlocks: 1,
       orphanEmbeddings: 1,
+      revokedPushSubscriptions: 0,
     });
 
     const sessions = database.db.prepare<[], { id: string }>("SELECT id FROM user_sessions").all();
@@ -170,6 +171,7 @@ Deno.test("manutenção é idempotente e não apaga dados de domínio", async ()
       completedEvents: 0,
       expiredIpBlocks: 0,
       orphanEmbeddings: 0,
+      revokedPushSubscriptions: 0,
     });
 
     const user = database.db

@@ -69,16 +69,17 @@ services:
 
 ---
 
-## Passo 2 — Worker de IA (perfil `ai`)
+## Passo 2 — Worker de IA e push (perfis `ai` e `push`)
 
-O worker de IA é um serviço separado que consome a outbox. No Portainer,
-perfis do Compose (`profiles`) não são ativados automaticamente.
+O worker é um serviço separado que consome a outbox e entrega as notificações
+push. No Portainer, perfis do Compose (`profiles`) não são ativados
+automaticamente.
 
 Para subir o worker:
 
 1. No Portainer, vá em **Stacks** → `vivabem` → **Editor**.
 2. Adicione o serviço `worker` ao stack (ele já está no `compose.yaml` com
-   `profiles: ["ai"]`).
+   `profiles: ["ai", "push"]`).
 3. Ou crie um stack separado apenas para o worker com o mesmo `compose.yaml`,
    definindo apenas as variáveis de ambiente do worker.
 4. Variáveis obrigatórias do worker (quando `AI_ENABLED=true`):
@@ -89,9 +90,12 @@ Para subir o worker:
    - `AI_API_BASE_URL` e `AI_API_KEY` (se `openai`)
    - `AI_MODEL` (se `ollama`)
    - `WORKER_ID=worker-01`
+5. Com push ligado (`PUSH_ENABLED=true`), repasse também ao worker as mesmas
+   `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY` e `PUSH_VAPID_SUBJECT` da
+   API. Gere o par uma única vez com `deno task push:keys`.
 
-Se não for usar IA, deixe `AI_ENABLED=false` e não suba o worker. A API
-funciona normalmente sem ele.
+Se não for usar IA nem push, deixe `AI_ENABLED=false` e `PUSH_ENABLED=false` e
+não suba o worker. A API funciona normalmente sem ele.
 
 ---
 

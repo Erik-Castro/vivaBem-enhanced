@@ -12,6 +12,7 @@ export const ERROR_STATUS = {
   RATE_LIMITED: 429,
   INTERNAL_ERROR: 500,
   AI_DISABLED: 503,
+  PUSH_DISABLED: 503,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_STATUS;

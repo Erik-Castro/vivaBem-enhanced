@@ -409,3 +409,54 @@ sobrescrito uma vez antes desta regra; o caminho formal passou a ser o `1.0.1`.
 `CHANGELOG.md`, commit `chore(release)`, tag anotada e push das imagens com a
 tag nova. Rollback aponta para uma tag antiga intacta, nunca para um rebuild da
 mesma tag.
+
+## ADR-038 — Push pela própria fila de notificações
+
+**Decisão:** a entrega de Web Push usa a linha de `notifications` como fila,
+com `push_state` (`pending|sent|skipped|failed`), `push_attempts` e
+claim/lease (`push_claim_token`/`push_claim_expires_at`). Não existe evento
+próprio na outbox e nenhum dos pontos que criam notificação conhece push. O
+worker entrega em processo próprio, independente de `AI_ENABLED`.
+
+**Motivo:** criar um evento por notificação exigiria mudar todos os call sites
+e duplicar o registro; a notificação já é o agregado que precisa ser entregue.
+Claim/lease na própria tabela dispensa transação distribuída e permite vários
+workers sem entrega duplicada enquanto o lease vale.
+
+**Consequência:** a notificação pode chegar à central e falhar no push sem
+quebrar a transação de negócio. `404`/`410` do serviço de push revogam a
+assinatura; falhas transitórias voltam para `pending` até `PUSH_MAX_ATTEMPTS` e
+depois viram `failed`. O worker só roda com `AI_ENABLED` ou `PUSH_ENABLED`; com
+os dois desligados ele registra `worker_disabled` e encerra.
+
+## ADR-039 — Chaves VAPID no ambiente, nunca no banco
+
+**Decisão:** o par VAPID é configurado por `PUSH_VAPID_PUBLIC_KEY`/
+`PUSH_VAPID_PRIVATE_KEY` (JWK EC P-256) e validado no boot; `deno task
+push:keys` gera o par. A API expõe apenas o ponto público e o worker usa o
+privado para assinar. Nada é persistido no SQLite.
+
+**Motivo:** a chave privada é segredo de instalação, não dado de usuário; o
+banco entra em backup e pode ser exportado, o ambiente não. A validação de boot
+converte um erro de configuração em falha explícita, em vez de 401 silencioso
+no primeiro envio.
+
+**Consequência:** trocar o par invalida as assinaturas existentes (o navegador
+renegocia ao reabrir o app). `PUSH_ENABLED=true` exige as três variáveis juntas
+— chave sem sujeito produziria recusa do serviço de push só em produção.
+
+## ADR-040 — Background Sync híbrido e sem refresh no service worker
+
+**Decisão:** mutações offline são gravadas em IndexedDB com `Idempotency-Key` e
+snapshot do CSRF. Quando há aba aberta, o service worker apenas pede que a
+página reproduza a fila; sem aba, ele tenta com o snapshot e aborta em
+`401`/`403`. O service worker nunca chama `/auth/refresh`.
+
+**Motivo:** refresh é de uso único e reuso revoga a família inteira de tokens.
+Duas renovações concorrentes (aba + worker) derrubariam a sessão do usuário. O
+service worker também não lê cookies HttpOnly, então não consegue montar o
+`X-CSRF-Token` sozinho.
+
+**Consequência:** em navegadores sem Background Sync a fila espera o próximo
+`online` com o app aberto; um CSRF rotacionado sem aba aberta adia o replay em
+vez de arriscar a sessão. A idempotência no servidor mantém o reenvio seguro.

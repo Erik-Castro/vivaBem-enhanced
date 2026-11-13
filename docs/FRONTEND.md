@@ -16,7 +16,7 @@ consumindo a API em `/api/v1` pela mesma origem.
 |---|---|
 | Framework | Svelte 5 com runes (`$state`, `$derived`, `$effect`, `$props`) |
 | Build | Vite 7.3.8 + `@sveltejs/vite-plugin-svelte` 6.2.4 |
-| PWA | `vite-plugin-pwa` 2 (`generateSW`, Workbox) |
+| PWA | `vite-plugin-pwa` 2 (`injectManifest`, Workbox + `web/src/sw.ts`) |
 | Rotas | Hash routing (`#/dashboard`), sem servidor de rotas |
 | Estilo | CSS próprio com design tokens; sem Tailwind nem biblioteca de componentes |
 | Ícones | SVG locais em `web/src/lib/icons.ts` |
@@ -85,12 +85,16 @@ web/
   Dockerfile            # build (Node 24) + runtime (nginx-unprivileged)
   public/               # favicons, ícones PNG/SVG e manifest assets
   src/
-    main.ts             # monta o App
+    main.ts             # monta o App, registra o SW e escuta mensagens dele
+    sw.ts               # service worker (precache, push, sync, badge)
     App.svelte          # guards de rota e composição das páginas
     app.css             # design tokens, layout e responsividade
     lib/
-      api.ts            # fetch tipado, CSRF, refresh e erros
+      api.ts            # fetch tipado, CSRF, refresh, erros e fila offline
       auth.svelte.ts    # store de sessão (login, register, logout, init)
+      push.svelte.ts    # opt-in de push, assinatura e reconciliação
+      offline-queue.ts  # fila de mutações em IndexedDB
+      notification-links.ts # tradução de links da API para rotas do SPA
       router.svelte.ts  # hash router reativo
       theme.svelte.ts   # tema claro/escuro persistido
       toast.svelte.ts   # fila de notificações
@@ -136,8 +140,8 @@ piscar a tela de login durante o bootstrap.
 
 ### 4.2 Estado
 
-- Estado global apenas onde precisa ser global: `auth`, `router`, `theme` e
-  `toasts` (arquivos `.svelte.ts` com runes).
+- Estado global apenas onde precisa ser global: `auth`, `router`, `theme`,
+  `toasts` e `push` (arquivos `.svelte.ts` com runes).
 - Dados de tela são locais à página (`$state`) e recarregados após mutações.
 - Nada de store genérica, cache global de dados ou estado derivado duplicado.
 
@@ -160,7 +164,8 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
 
 1. `auth.init()` chama `GET /me`; se falhar, tenta `POST /auth/refresh`.
 2. Login/registro recebem `{ user, csrfToken }` e atualizam o store.
-3. Logout chama `POST /auth/logout` e limpa o estado local.
+3. Logout desfaz o vínculo push do dispositivo (com a sessão ainda válida,
+   para ter CSRF), chama `POST /auth/logout` e limpa o estado local.
 4. Revogar a sessão corrente na tela de configurações encerra a sessão e volta
    para o login.
 
@@ -250,6 +255,27 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
   IA sem esconder os insights já gerados. Severidades usam os mesmos badges do
   restante da interface e a confiança é exibida em percentual.
 
+### 4.11 Push e uso offline
+
+- `push.svelte.ts` separa três estados: `supported` (APIs do navegador),
+  `enabled` (servidor com `PUSH_ENABLED=true`) e `subscribed` (este dispositivo
+  tem assinatura viva). O opt-in fica em **Configurações → Notificações push**.
+- Ao ativar, o store pede permissão, assina com a chave VAPID devolvida por
+  `GET /notifications/push/key` e envia endpoint + chaves para
+  `POST /notifications/push/subscriptions`. Desativar revoga no servidor antes
+  de cancelar a assinatura do navegador.
+- No boot (e ao entrar), o store reconcilia o dispositivo: só reenvia a
+  assinatura quando o endpoint já está registrado no servidor. Reenviar um
+  endpoint revogado reativaria o dispositivo sem o usuário pedir.
+- Se o navegador rotacionar a assinatura, o service worker envia
+  `push-subscription-change`; `main.ts` escuta e a página refaz o vínculo, pois
+  só ela consegue montar o `X-CSRF-Token`.
+- "Enviar aviso de teste" cria uma notificação normal (202) entregue pelo
+  worker; a central do sino e o push mostram o mesmo item.
+- Sem rede, mutações são gravadas em IndexedDB (`offline-queue.ts`) com
+  `Idempotency-Key` e snapshot de CSRF. O replay acontece quando o cliente está
+  aberto (evento `online`) ou pelo Background Sync com o app fechado.
+
 ---
 
 ## 5. Tema e acessibilidade
@@ -270,15 +296,32 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
 
 ## 6. PWA
 
-- `vite-plugin-pwa` gera `sw.js`, `manifest.webmanifest` e o precache do app
-  shell (HTML, JS, CSS, ícones).
-- Estratégia: `generateSW`, `navigateFallback: "/index.html"`,
-  `cleanupOutdatedCaches: true`.
-- **A API não é cacheada**: apenas o shell é precached; chamadas `/api/**` vão
-  sempre para a rede.
+- `vite-plugin-pwa` roda em `strategies: "injectManifest"` com o handler
+  próprio `web/src/sw.ts`, gerando `sw.js`, `manifest.webmanifest` e o precache
+  do app shell (HTML, JS, CSS, ícones). `autoUpdate` é combinado com
+  `skipWaiting`/`clientsClaim` manuais no worker.
+- `manifest.webmanifest` é gerado pelo `vite.config.ts` (não há arquivo físico):
+  `id: "/"`, `start_url: "/"`, `scope: "/"`, `display: standalone`,
+  `display_override: ["standalone", "minimal-ui"]`,
+  `categories: ["finance", "productivity", "lifestyle"]`.
+- **A API não é cacheada**: apenas o shell é precached; `/api/**`, `/health` e
+  `/ready` vão sempre para a rede. O `NavigationRoute` tem esses caminhos na
+  denylist para nunca devolver `index.html` no lugar de um JSON.
+- **Push (Web Push/VAPID)**: o handler `push` mostra a notificação com
+  `icon`/`badge`, usa `tag` do id (reenvio substitui o aviso) e guarda o link
+  já traduzido em `notification.data`. `notificationclick` foca uma aba aberta
+  e navega pelo hash, ou abre uma nova. `pushsubscriptionchange` apenas avisa as
+  abas, porque o worker não lê cookies (CSRF) e não pode renovar a sessão.
+- **Background Sync** (`vivabem-flush`): com aba aberta o worker repassa o
+  pedido para a página, que tem sessão e CSRF atuais. Sem aba, ele reproduz a
+  fila com o snapshot de CSRF persistido; `401`/`403` interrompem a tentativa
+  para a próxima abertura (renovar no worker revogaria a família de tokens).
+- **Periodic Background Sync** (`vivabem-refresh`, `minInterval` 24h): atualiza
+  apenas o badge de não lidas via `GET /notifications/unread-count`
+  (`setAppBadge`/`clearAppBadge`), quando o navegador suporta.
 - Ícones em PNG (`192`, `512`, `maskable`) e SVG, mais `apple-touch-icon`.
-- O service worker não faz *background sync* nem fila de mutações: sem rede, a
-  aplicação abre mas as ações falham com mensagem de erro.
+- O tipo do worker é validado por `tsconfig.sw.json` (lib `webworker`), separado
+  do `tsconfig.json` da SPA.
 
 ---
 
@@ -323,7 +366,10 @@ frontend e, em HTTP local, `COOKIE_SECURE=false`.
 
 - Hash routing por simplicidade de hospedagem estática; URLs não são
   renderizadas no servidor nem indexáveis.
-- Sem cache offline de dados, fila de mutações ou sincronização em segundo plano.
+- Sem cache offline de dados: a fila cobre apenas mutações (POST/PUT/PATCH/
+  DELETE), não leituras. Abrir uma tela nova sem rede falha com aviso.
+- Background Sync e Periodic Sync não existem em todos os navegadores (Firefox e
+  Safari têm suporte parcial); nesses casos valem o replay com o app aberto e o
+  badge atualizado no boot/polling.
 - Lista de transações usa paginação por `limit`/`offset`, sem virtualização.
-
 - Sem testes de unidade de componentes (apenas typecheck e build no CI).

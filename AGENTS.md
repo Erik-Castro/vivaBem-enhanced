@@ -74,6 +74,7 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/modules/investments/` | ativos, operações, cotações, posições e performance |
 | `src/modules/achievements/` | catálogo, DSL de critérios, progresso e desbloqueio |
 | `src/modules/notifications/` | notificações escopadas, leitura e contagem |
+| `src/modules/notifications/notifications.push.*` | assinaturas push, sender VAPID, dispatcher e rotas |
 | `src/modules/insights/` | insights da IA, leitura, contagem, busca e feedback |
 | `src/modules/import/` | parsers CSV/OFX, preview, dedupe e commit idempotente |
 | `src/modules/export/` | bundle JSON completo e CSV de transações |
@@ -92,6 +93,8 @@ As Fases 0 (`0.1.0`), 1 (`0.2.0`), 2 (`0.3.0`), 3 (`0.4.0`), 4 (`0.5.0`), 5 (`0.
 | `src/db/migrations/008_data.sql` | vínculos familiares e unicidade de `import_hash` |
 | `src/db/migrations/009_hardening.sql` | índices de manutenção (sessões e outbox) |
 | `src/db/migrations/010_worker.sql` | lease da outbox, `dead_letter`, replay e `dedupe_key` |
+| `src/db/migrations/011_idempotency.sql` | chaves de idempotência por usuário |
+| `src/db/migrations/012_push.sql` | assinaturas push e `push_state` das notificações |
 | `src/app.ts` | factory do Hono (sem efeitos colaterais) |
 | `src/main.ts` | bootstrap da API: config → migrações → seed → catch-up → servidor (sem worker) |
 | `tests/` | unitários e integração com SQLite real (241 testes) |
@@ -133,6 +136,7 @@ deno task db:reset       # apaga e recria o banco
 deno task db:backup      # backup em backups/
 deno task outbox:replay --list   # eventos em dead letter
 deno task outbox:replay --id=<uuid> --force  # recoloca na fila
+deno task push:keys      # gera o par VAPID para o .env/Portainer
 deno task check:release  # valida versão x CHANGELOG
 
 make web-install         # npm ci em web/
@@ -436,6 +440,30 @@ src/modules/<dominio>/
 - `npm run check` deve ficar em 0 erros e 0 warnings; `npm run build` deve gerar
   `sw.js` e o manifest.
 
+### 5.12 Push e offline
+
+- Push é opt-in por dispositivo: `push.svelte.ts` separa `supported` (APIs do
+  navegador), `enabled` (`PUSH_ENABLED` no servidor) e `subscribed` (assinatura
+  viva deste dispositivo). O opt-in fica em Configurações.
+- A entrega usa a própria linha de `notifications` (`push_state`, `push_attempts`
+  e claim/lease) em vez de um evento novo na outbox; nenhum call site de
+  notificação conhece push.
+- O worker entrega push de forma independente da IA: ele sobe com `AI_ENABLED`
+  ou `PUSH_ENABLED` e só encerra com os dois desligados (`worker_disabled`).
+- `404`/`410` do serviço de push revogam a assinatura; falhas transitórias voltam
+  para `pending` até `PUSH_MAX_ATTEMPTS` e depois viram `failed`.
+- As chaves VAPID vivem só no ambiente (nunca no banco); `deno task push:keys`
+  gera o par e `assertPushConfig` falha no boot se faltar alguma.
+- Com `PUSH_ENABLED=false` as rotas de escrita respondem `PUSH_DISABLED` (503).
+- O service worker (`web/src/sw.ts`, `injectManifest`) cuida de `push`,
+  `notificationclick` e badge; mutações offline vão para IndexedDB com
+  `Idempotency-Key` e snapshot de CSRF.
+- Background Sync é híbrido: com aba aberta a página reproduz a fila; sem aba o
+  worker tenta com o snapshot e aborta em `401`/`403`. **O service worker nunca
+  chama `/auth/refresh`** — duas renovações revogariam a família de tokens.
+- Periodic Background Sync (`vivabem-refresh`, 24h) só atualiza o badge; a API
+  nunca é cacheada.
+
 ---
 
 ## 6. Convenções de código
@@ -683,6 +711,8 @@ deno test --coverage
 - ❌ Adicionar Tailwind, biblioteca de componentes ou fonte externa no frontend.
 - ❌ Guardar access/refresh token em `localStorage` ou em memória no frontend.
 - ❌ Cachear respostas de `/api/**` no service worker.
+- ❌ Chamar `/auth/refresh` de dentro do service worker (revoga a família de tokens).
+- ❌ Persistir chaves VAPID no banco ou no repositório (só ambiente).
 - ❌ Subir Vite 8/Rolldown: quebra o build em CPUs AVX-only.
 
 ---
@@ -764,6 +794,10 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `web/src/components/NotificationBell.svelte` | Botão do sino com badge de não lidas |
 | `web/src/components/NotificationPanel.svelte` | Painel/bottom sheet das notificações recentes |
 | `web/src/lib/notifications.svelte.ts` | Store do sino, polling e tradução de links |
+| `web/src/lib/push.svelte.ts` | Opt-in de push, assinatura, reconciliação e revogação |
+| `web/src/lib/offline-queue.ts` | Fila de mutações em IndexedDB com snapshot de CSRF |
+| `web/src/sw.ts` | Service worker: precache, push, Background/Periodic Sync e badge |
+| `web/tsconfig.sw.json` | Typecheck do service worker (lib `webworker`) |
 | `web/src/pages/Insights.svelte` | Insights, filtros, busca, leitura e feedback |
 | `web/src/pages/Data.svelte` | Importação CSV/OFX (prévia/commit) e exportação |
 | `web/src/pages/Family.svelte` | Convites, vínculo ativo e resumo do parceiro |
@@ -779,11 +813,13 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/config.ts` | Configuração validada com Zod |
 | `src/db/client.ts` | Conexão SQLite + extensão vetorial |
 | `src/db/migrate.ts` | Runner de migrações forward-only |
-| `src/db/maintenance.ts` | Limpeza operacional (sessões, outbox, IPs, embeddings) |
+| `src/db/maintenance.ts` | Limpeza operacional (sessões, outbox, IPs, embeddings, push revogado) |
 | `src/db/backup.ts` | Backup consistente com `VACUUM INTO` |
 | `src/db/backup-cli.ts` | CLI `deno task db:backup` |
 | `src/app.ts` | Factory do Hono |
 | `src/main.ts` | Bootstrap da aplicação |
+| `src/shared/crypto/vapid.ts` | Parse do JWK VAPID e `applicationServerKey` |
+| `scripts/generate-vapid.ts` | CLI `deno task push:keys` |
 | `src/http/cookies.ts` | Cookies de autenticação e CSRF |
 | `src/http/middleware/auth.ts` | Exige access token e sessão ativa |
 | `src/http/middleware/csrf.ts` | Double-submit + Origin/Sec-Fetch-Site |
@@ -800,6 +836,11 @@ Detalhes, estimativas e critérios de aceite: [`docs/PLAN.md`](docs/PLAN.md).
 | `src/modules/investments/` | Ativos, operações, cotações, posições e performance |
 | `src/modules/achievements/` | Catálogo, DSL de critérios, progresso e desbloqueio |
 | `src/modules/notifications/` | Notificações escopadas, leitura e contagem |
+| `src/modules/notifications/notifications.push.repository.ts` | Assinaturas e claim/lease da entrega push |
+| `src/modules/notifications/notifications.push.dispatcher.ts` | Loop de entrega, retry e revogação em 404/410 |
+| `src/modules/notifications/notifications.push.sender.ts` | Wrapper de `jsr:@negrel/webpush` |
+| `src/modules/notifications/notifications.push.service.ts` | Regras de inscrição e aviso de teste |
+| `src/modules/notifications/notifications.push.controller.ts` | Rotas `/notifications/push` |
 | `src/modules/insights/` | Insights da IA, leitura, contagem, busca e feedback |
 | `src/modules/import/` | Parsers CSV/OFX, preview, dedupe e commit idempotente |
 | `src/modules/export/` | Bundle JSON completo e CSV de transações |

@@ -19,7 +19,11 @@ Base: `/api/v1`. A especificação completa e sempre atualizada está em
 ## Códigos de erro
 
 `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`,
-`RATE_LIMITED`, `PAYLOAD_TOO_LARGE`, `AI_DISABLED`, `INTERNAL_ERROR`.
+`RATE_LIMITED`, `PAYLOAD_TOO_LARGE`, `AI_DISABLED`, `PUSH_DISABLED`,
+`INTERNAL_ERROR`.
+
+`AI_DISABLED` e `PUSH_DISABLED` são `503`: a instalação desligou o recurso, não
+é erro de contrato nem de cliente.
 
 ## Autenticação
 
@@ -51,6 +55,7 @@ limitadas trazem `X-RateLimit-Limit`, `X-RateLimit-Remaining` e `Retry-After`.
 | IA | `/insights` | leitura, busca e feedback de insights |
 | Dados | `/import`, `/export` | CSV/OFX e bundle JSON/CSV |
 | Colaboração | `/family` | convites e resumo agregado |
+| Push | `/notifications/push` | chave VAPID, dispositivos e aviso de teste |
 
 A análise de IA é assíncrona: a escrita responde sem esperar o provider e o
 evento é consumido pelo worker independente (`src/worker/`). Por isso um insight
@@ -68,6 +73,25 @@ A lista completa de endpoints e schemas está em `/api/v1/openapi.json` e no
 - Reimportar o mesmo arquivo é idempotente (`import_hash` por conta).
 - `GET /api/v1/export?format=json|csv` devolve os dados do usuário autenticado;
   hashes de senha/refresh e vetores de embedding nunca entram no bundle.
+
+## Push
+
+- `GET /api/v1/notifications/push/key` devolve `{ enabled, publicKey }`; a chave
+  é o ponto P-256 não comprimido em base64url para
+  `PushManager.subscribe({ applicationServerKey })`.
+- `POST /api/v1/notifications/push/subscriptions` registra o dispositivo
+  (`endpoint` + `keys.p256dh`/`keys.auth`). O índice único é parcial no
+  `endpoint` entre linhas vivas, então o mesmo navegador que troca de conta
+  reatribui a assinatura em vez de duplicá-la.
+- `GET` lista os dispositivos vivos; `DELETE` (com `endpoint` no corpo) revoga.
+  Endpoint de outro usuário responde `404`, nunca `403`.
+- `POST /api/v1/notifications/push/test` grava uma notificação normal e responde
+  `202`; a entrega é feita pelo worker, não pela API.
+- Com `PUSH_ENABLED=false` as rotas de escrita respondem `PUSH_DISABLED` (503) e
+  a chave vem `disabled` com `publicKey: null`.
+- A entrega é at-least-once com claim/lease na própria linha de `notifications`
+  (`push_state`); `404`/`410` do serviço de push revogam a assinatura, falhas
+  transitórias tentam de novo até `PUSH_MAX_ATTEMPTS`.
 
 ## Saúde
 

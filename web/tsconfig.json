@@ -15,5 +15,6 @@
     "checkJs": false,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.svelte", "vite.config.ts"],
+  "exclude": ["src/sw.ts", "src/lib/offline-queue.ts", "src/lib/notification-links.ts"]
 }
