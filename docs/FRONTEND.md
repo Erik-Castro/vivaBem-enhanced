@@ -344,6 +344,11 @@ O frontend nunca lê tokens: `vb_access` e `vb_refresh` são HttpOnly. O fluxo �
   `Permissions-Policy`, COOP e `X-Permitted-Cross-Domain-Policies`.
 - `location = /healthz` para o healthcheck do container.
 
+O arquivo é copiado para `/etc/nginx/conf.d/default.conf`, que o `nginx.conf` da
+imagem inclui **dentro** do bloco `http {}`. Por isso ele contém apenas `map` e
+`server` no nível superior: envolver o conteúdo em outro `http {}` faz o nginx
+abortar com `"http" directive is not allowed here` e o container não sobe.
+
 No Compose, o serviço `web` depende de a API estar saudável e publica
 `${WEB_PORT:-8080}:8080`. A API precisa de `APP_ORIGIN` igual à origem pública do
 frontend e, em HTTP local, `COOKIE_SECURE=false`.
@@ -354,6 +359,8 @@ frontend e, em HTTP local, `COOKIE_SECURE=false`.
 
 - `npm run check` precisa ficar em **0 erros e 0 warnings**.
 - `npm run build` precisa gerar `sw.js` e o manifest.
+- `nginx -t` sobre `web/nginx.conf` roda no CI (com `--add-host vivabem:127.0.0.1`,
+  porque o `proxy_pass` resolve o nome na carga da configuração).
 - Fluxo manual mínimo: registro → conta → categoria → transação →
   transferência → resumo no painel → preferências/tema → sessões → logout.
 - Testes automatizados de UI ainda não fazem parte do CI; a validação de
