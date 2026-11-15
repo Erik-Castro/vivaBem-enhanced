@@ -7,13 +7,29 @@ adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-15
+
+### Fixed
+
+- **A imagem `vivabem-web` não subia**: `web/nginx.conf` é copiado para
+  `/etc/nginx/conf.d/default.conf`, que o `nginx.conf` da imagem inclui DENTRO do bloco
+  `http {}` — e o arquivo trazia um wrapper `http { ... }`. O nginx abortava com
+  `"http" directive is not allowed here` e o container entrava em restart loop: a origem
+  respondia 502 em tudo e o SPA, servido pelo precache do service worker, mostrava
+  "Não foi possível iniciar a proteção CSRF". O wrapper foi removido.
+
+### Added
+
+- O job de frontend no CI roda `nginx -t` sobre `web/nginx.conf`, para que uma configuração
+  inválida não chegue à imagem publicada.
+
 ### Changed
 
 - `docs/DEPLOY.md` documenta o dimensionamento de `AI_REQUEST_TIMEOUT` para modelo local em CPU:
   com Ollama sem GPU (`"size_vram": 0`) um evento financeiro leva ~110 s (prompt eval 95 s +
   geração 13 s) e o padrão de 60 s aborta toda tentativa, levando o evento a `dead_letter` com
   `lastError = "Falha de rede no Ollama"`.
-- `compose.yaml` e `portainer-stack.yml` passam a usar `1.1.1` como versão padrão; README,
+- `compose.yaml` e `portainer-stack.yml` passam a usar `1.1.2` como versão padrão; README,
   `AGENTS.md` e `docs/DEPLOY-PORTAINER.md` alinhados à release atual.
 - `web/test-results/` deixa de ser versionado (artefato do Playwright) e passa a constar no
   `.gitignore`, junto de `web/playwright-report/`.

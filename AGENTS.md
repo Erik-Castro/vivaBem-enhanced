@@ -4,7 +4,7 @@ Guia para agentes de IA e contribuidores. Leia este arquivo **antes** de alterar
 
 - **Plano canônico:** [`docs/PLAN.md`](docs/PLAN.md)
 - **Referência legada:** `reference_only/` — **somente leitura**, nunca editar
-- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão `1.1.1`
+- **Status:** reescrita greenfield, API-first; Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos), 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão `1.1.2`
 
 ---
 
@@ -641,6 +641,8 @@ Regras:
   Background Sync e Periodic Sync.
 - Décima sexta release: `1.1.1` (2026-11-13), correção dos achados P0/P1 da auditoria de segurança
   (spoofing de `X-Forwarded-For`, SSRF no push, headers do Nginx) e P2 de baixo custo.
+- Décima sétima release: `1.1.2` (2026-11-15), correção do `web/nginx.conf` (bloco `http`
+  aninhado impedia o nginx de subir) e gate `nginx -t` no CI.
 
 ### 11.3 Conventional Commits (recomendado)
 
