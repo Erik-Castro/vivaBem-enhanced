@@ -350,7 +350,9 @@ web/               # SPA Svelte 5 + Vite + PWA (Nginx no Compose)
 
 Fases 0 (fundação), 1 (identidade), 2 (finanças), 3 (planejamento), 4 (hábitos), 5 (investimentos),
 6 (engajamento), 7 (eventos + IA), 8 (dados e colaboração), 9 (hardening e operação), 10 (frontend
-Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão atual `1.1.0`. Todas as telas do
+Svelte 5 + Vite/PWA) e 11 (worker independente) concluídas — versão atual `1.1.1`. Todas as telas do
 frontend foram entregues: autenticação, painel, contas, transações, categorias, orçamentos, metas,
 hábitos, investimentos e conquistas. A `1.1.0` adicionou notificações push (VAPID), fila offline com
-Background Sync e Periodic Sync. Veja o roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).
+Background Sync e Periodic Sync; a `1.1.1` corrigiu os achados P0/P1 da auditoria de segurança
+(spoofing de `X-Forwarded-For`, SSRF no push, headers do Nginx) e os P2 de baixo custo. Veja o
+roadmap em [`AGENTS.md`](AGENTS.md#16-roadmap).

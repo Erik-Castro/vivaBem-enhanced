@@ -7,6 +7,13 @@ adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Changed
+
+- `compose.yaml` e `portainer-stack.yml` passam a usar `1.1.1` como versão padrão; README,
+  `AGENTS.md` e `docs/DEPLOY-PORTAINER.md` alinhados à release atual.
+- `web/test-results/` deixa de ser versionado (artefato do Playwright) e passa a constar no
+  `.gitignore`, junto de `web/playwright-report/`.
+
 ## [1.1.1] - 2026-11-13
 
 ### Security

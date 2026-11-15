@@ -25,7 +25,7 @@ fazer push manual das imagens.
 5. Em **Environment variables**, adicione:
    - `APP_ORIGIN=https://app.seudominio.com`
    - `JWT_SECRET=<seu segredo de 32+ caracteres>`
-   - `VERSION=1.1.0`
+   - `VERSION=1.1.1`
    - `COOKIE_SECURE=true`
    - `ENV=production`
    - `AI_ENABLED=false` (ou `true` se quiser IA com provider configurado)
@@ -36,7 +36,7 @@ fazer push manual das imagens.
    - As demais variáveis do `.env.production.example` conforme necessário.
 6. Clique em **Deploy the stack**.
 
-O Portainer fará o build das imagens `vivabem:1.1.0` e `vivabem-web:1.1.0` localmente no endpoint
+O Portainer fará o build das imagens `vivabem:1.1.1` e `vivabem-web:1.1.1` localmente no endpoint
 Docker.
 
 ---
@@ -47,7 +47,7 @@ Se preferir construir as imagens fora do Portainer e usar um registry:
 
 ```bash
 # Na máquina com Docker disponível:
-VERSION=1.1.0
+VERSION=1.1.1
 
 # Build da API
 docker build --build-arg VERSION="$VERSION" -t registry.seudominio.com/vivabem:"$VERSION" .
@@ -66,10 +66,10 @@ local:
 ```yaml
 services:
   vivabem:
-    image: registry.seudominio.com/vivabem:1.1.0
+    image: registry.seudominio.com/vivabem:1.1.1
     # ... restante sem a chave `build`
   web:
-    image: registry.seudominio.com/vivabem-web:1.1.0
+    image: registry.seudominio.com/vivabem-web:1.1.1
     # ... restante sem a chave `build`
 ```
 

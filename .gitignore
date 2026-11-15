@@ -7,6 +7,10 @@ coverage/
 build/
 dist/
 
+# Artefatos de teste do Playwright
+web/test-results/
+web/playwright-report/
+
 # Banco de dados local
 data/
 backups/
