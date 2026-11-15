@@ -26,6 +26,10 @@ backups/
 # Ferramentas locais
 .codegraph/
 
+# Relatórios originais da auditoria externa (evidência local; contêm detalhes de infraestrutura)
+SECURITY_AUDIT_REPORT.md
+audit_report.*
+
 # Artefatos de teste manuais (contêm tokens de sessão)
 cookies*.txt
 *_cookies.txt

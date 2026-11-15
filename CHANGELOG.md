@@ -13,6 +13,8 @@ adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
   `AGENTS.md` e `docs/DEPLOY-PORTAINER.md` alinhados à release atual.
 - `web/test-results/` deixa de ser versionado (artefato do Playwright) e passa a constar no
   `.gitignore`, junto de `web/playwright-report/`.
+- `SECURITY_AUDIT_REPORT.md` e `audit_report.*` (evidências originais da auditoria) ficam no
+  `.gitignore`: são preservados localmente, mas não entram no repositório público.
 
 ## [1.1.1] - 2026-11-13
 
