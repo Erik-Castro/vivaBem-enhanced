@@ -9,6 +9,10 @@ adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Changed
 
+- `docs/DEPLOY.md` documenta o dimensionamento de `AI_REQUEST_TIMEOUT` para modelo local em CPU:
+  com Ollama sem GPU (`"size_vram": 0`) um evento financeiro leva ~110 s (prompt eval 95 s +
+  geração 13 s) e o padrão de 60 s aborta toda tentativa, levando o evento a `dead_letter` com
+  `lastError = "Falha de rede no Ollama"`.
 - `compose.yaml` e `portainer-stack.yml` passam a usar `1.1.1` como versão padrão; README,
   `AGENTS.md` e `docs/DEPLOY-PORTAINER.md` alinhados à release atual.
 - `web/test-results/` deixa de ser versionado (artefato do Playwright) e passa a constar no

@@ -26,6 +26,9 @@ backups/
 # Ferramentas locais
 .codegraph/
 
+# Stack e logs do homelab de teste (contêm segredos e artefatos grandes)
+dont_commit/
+
 # Relatórios originais da auditoria externa (evidência local; contêm detalhes de infraestrutura)
 SECURITY_AUDIT_REPORT.md
 audit_report.*

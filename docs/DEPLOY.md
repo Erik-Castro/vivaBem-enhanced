@@ -103,6 +103,36 @@ Alternativa apenas em hosts Linux que não devem expor o Ollama na rede: rodar o
 `network_mode: host` e `AI_OLLAMA_URL=http://127.0.0.1:11434`. Com `AI_PROVIDER=openai` isso não se
 aplica: use `AI_API_BASE_URL` e `AI_API_KEY`.
 
+### Modelo local em CPU
+
+Sem GPU, a avaliação do prompt domina o tempo. Medido em um Ollama CPU-only (`"size_vram": 0` em
+`/api/ps`), um evento `finance.transaction.created` gasta ~95 s de prompt eval (2.100 tokens) mais
+~13 s de geração — **~110 s por evento**. O `AI_REQUEST_TIMEOUT` padrão de 60 s aborta todas as
+tentativas e o evento termina em `dead_letter` com `lastError = "Falha de rede no Ollama"` — a
+mensagem genérica do `fetch` abortado, não uma falha de rede.
+
+Meça antes de definir o limite, com o mesmo tamanho de prompt do evento:
+
+```bash
+curl -s http://<ollama>:11434/api/chat -H 'Content-Type: application/json' -d @payload.json \
+  | jq '.prompt_eval_duration/1e9, .eval_duration/1e9'
+```
+
+Dimensionamento do serviço `worker`:
+
+| Variável                      | Valor sugerido       | Por quê                                          |
+| ----------------------------- | -------------------- | ------------------------------------------------ |
+| `AI_REQUEST_TIMEOUT`          | 2–3× o tempo medido  | máximo aceito pela config é `600000` (10 min)    |
+| `WORKER_SHUTDOWN_GRACE_MS`    | maior que o timeout  | senão o `SIGTERM` abandona a geração em curso    |
+| `stop_grace_period` (Compose) | maior que o grace    | senão o Docker envia `SIGKILL` no meio           |
+| `WORKER_LEASE_MS`             | pode ficar `60000`   | o heartbeat de 15 s renova o lease durante o uso |
+
+A API aceita o mesmo `AI_REQUEST_TIMEOUT`, mas só o usa para embeddings de busca — ali valores
+curtos são desejáveis, porque `/insights/search` cai para busca textual (`LIKE`) na falha.
+
+Depois de corrigir o limite, devolva os eventos terminais à fila com
+`deno task outbox:replay --list` e `--id=<uuid> --force`.
+
 ### O que o Compose garante
 
 - API e frontend não-root (`appuser` uid 10001 / `nginx` uid 101), com imagens multi-stage.
